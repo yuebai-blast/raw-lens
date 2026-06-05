@@ -1,0 +1,17 @@
+# 只管两件事：锁工具版本 + 定义任务。
+# 运行时配置（端口、TLS 等）不放这里——见 README，用 flag 或进程环境变量。
+[tools]
+go = "1.26.4"
+
+[tasks.run]
+description = "本地运行（读 ./config.yaml）"
+run = "go run ./cmd/rawlens"
+
+[tasks.build]
+description = "编译成单二进制 ./bin/rawlens"
+run = "go build -o bin/rawlens ./cmd/rawlens"
+
+[tasks.build-linux]
+description = "交叉编译 linux/amd64，部署到服务器用"
+env = { GOOS = "linux", GOARCH = "amd64", CGO_ENABLED = "0" }
+run = "go build -o bin/rawlens-linux-amd64 ./cmd/rawlens"
