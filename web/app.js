@@ -8,6 +8,7 @@ const statusText = document.getElementById('statusText');
 let activeId = null;
 let activeTab = 'raw';
 let showCRLF = false;
+let bodyView = 'json';
 let knownIds = new Set();
 let firstLoad = true;
 let current = null; // 当前详情数据
@@ -22,6 +23,30 @@ function b64ToBytes(b64) {
 const decoder = new TextDecoder('utf-8', { fatal: false });
 const bytesToText = (b) => decoder.decode(b);
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function tryParseJSON(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+}
+
+function highlightJSON(value) {
+  const json = JSON.stringify(value, null, 2);
+  const tokenRe = /("(?:\\.|[^"\\])*"(?=\s*:))|("(?:\\.|[^"\\])*")|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false)\b|\bnull\b|([{}[\],:])/g;
+  return json.replace(tokenRe, (token, key, string, number, bool, punct) => {
+    const cls = key ? 'json-key'
+      : string ? 'json-string'
+      : number ? 'json-number'
+      : bool ? 'json-boolean'
+      : token === 'null' ? 'json-null'
+      : punct ? 'json-punct'
+      : '';
+    return cls ? `<span class="${cls}">${esc(token)}</span>` : esc(token);
+  });
+}
 
 function markCRLF(text) {
   return esc(text)
@@ -127,10 +152,21 @@ function render() {
       seen.set(key, true);
       rows += `<tr><td class="idx">${i + 1}</td><td class="hname">${esc(h.name)}</td><td class="hval">${esc(h.value)}${dup}</td></tr>`;
     });
-    pane = `<div class="hint">按收到顺序排列，header 名保留原始大小写，重复名不合并</div><table class="htable">${rows}</table>`;
+    pane = `<div class="hint">按收到顺序排列，header 名保留原始大小写，重复名不合并<button class="copy" id="copyHeaders">COPY</button></div><table class="htable">${rows}</table>`;
   } else if (activeTab === 'body') {
-    pane = `<div class="hint">${d.bodySize} 字节 body · 文本视图</div>
-            <pre class="wire">${esc(bytesToText(bodyBytes)) || '<span style="color:var(--muted)">(无 body)</span>'}</pre>`;
+    const bodyText = bytesToText(bodyBytes);
+    const parsedBody = tryParseJSON(bodyText);
+    const hasJSONView = parsedBody !== null;
+    const activeBodyView = bodyView === 'json' && hasJSONView ? 'json' : 'text';
+    const bodyTabs = `<div class="body-view-tabs">
+      <button class="body-view-btn ${activeBodyView === 'text' ? 'active' : ''}" data-view="text">TEXT</button>
+      <button class="body-view-btn ${activeBodyView === 'json' ? 'active' : ''}" data-view="json" ${hasJSONView ? '' : 'disabled title=\"body 不是合法 JSON\"'}>JSON</button>
+    </div>`;
+    const bodyContent = activeBodyView === 'json'
+      ? highlightJSON(parsedBody)
+      : esc(bodyText);
+    pane = `<div class="hint">${d.bodySize} 字节 body · ${activeBodyView.toUpperCase()} 视图${bodyTabs}<button class="copy" id="copyBody">COPY</button></div>
+            <pre class="wire ${activeBodyView === 'json' ? 'json-wire' : ''}">${bodyContent || '<span class="empty-body">(无 body)</span>'}</pre>`;
   } else {
     pane = `<div class="hint">完整原始字节 · 十六进制视图</div><pre class="hex">${toHex(rawBytes)}</pre>`;
   }
@@ -162,12 +198,37 @@ function render() {
   for (const el of detailEl.querySelectorAll('.tab')) {
     el.onclick = () => { activeTab = el.dataset.tab; render(); };
   }
+  for (const btn of detailEl.querySelectorAll('.body-view-btn')) {
+    btn.onclick = () => {
+      if (btn.disabled) return;
+      bodyView = btn.dataset.view;
+      render();
+    };
+  }
   const ct = document.getElementById('crlfToggle');
   if (ct) ct.onchange = () => { showCRLF = ct.checked; render(); };
   const cp = document.getElementById('copyRaw');
   if (cp) cp.onclick = () => {
     navigator.clipboard.writeText(bytesToText(rawBytes)).then(() => {
       cp.textContent = 'COPIED'; setTimeout(() => (cp.textContent = 'COPY'), 1200);
+    });
+  };
+  const copyHeaders = document.getElementById('copyHeaders');
+  if (copyHeaders) copyHeaders.onclick = () => {
+    const headerText = [d.requestLine, ...d.headers.map((h) => `${h.name}: ${h.value}`)].join('\r\n');
+    navigator.clipboard.writeText(headerText).then(() => {
+      copyHeaders.textContent = 'COPIED'; setTimeout(() => (copyHeaders.textContent = 'COPY'), 1200);
+    });
+  };
+  const copyBody = document.getElementById('copyBody');
+  if (copyBody) copyBody.onclick = () => {
+    const bodyText = bytesToText(bodyBytes);
+    const parsedBody = tryParseJSON(bodyText);
+    const hasJSONView = parsedBody !== null;
+    const activeBodyView = bodyView === 'json' && hasJSONView ? 'json' : 'text';
+    const copyText = activeBodyView === 'json' ? JSON.stringify(parsedBody, null, 2) : bodyText;
+    navigator.clipboard.writeText(copyText).then(() => {
+      copyBody.textContent = 'COPIED'; setTimeout(() => (copyBody.textContent = 'COPY'), 1200);
     });
   };
 }
