@@ -5,10 +5,10 @@ import (
 	"flag"
 	"log"
 
-	"rawlens/internal/capture"
-	"rawlens/internal/config"
-	"rawlens/internal/dashboard"
-	"rawlens/internal/store"
+	"github.com/yuebai-blast/raw-lens/internal/capture"
+	"github.com/yuebai-blast/raw-lens/internal/config"
+	"github.com/yuebai-blast/raw-lens/internal/dashboard"
+	"github.com/yuebai-blast/raw-lens/internal/store"
 )
 
 func main() {

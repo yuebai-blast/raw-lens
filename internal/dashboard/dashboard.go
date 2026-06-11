@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"rawlens/internal/store"
-	"rawlens/web"
+	"github.com/yuebai-blast/raw-lens/internal/store"
+	"github.com/yuebai-blast/raw-lens/web"
 )
 
 type summaryDTO struct {

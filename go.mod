@@ -1,4 +1,4 @@
-module rawlens
+module github.com/yuebai-blast/raw-lens
 
 go 1.26
 

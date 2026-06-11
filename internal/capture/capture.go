@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"rawlens/internal/store"
+	"github.com/yuebai-blast/raw-lens/internal/store"
 )
 
 // Serve 在 addr 上监听并把抓到的请求写进 st。
