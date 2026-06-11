@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+# 同一分支/PR 的新提交会取消仍在跑的旧任务；main 上的提交不取消，保证每次都有完整记录
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 工具链版本（go、goreleaser）唯一来源是 mise.toml，避免和本地、go.mod 漂移
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v2
+
+      - name: Check formatting
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "以下文件需要 gofmt:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Build
+        run: mise run build
+
+      - name: Check GoReleaser config
+        run: mise run release-check
