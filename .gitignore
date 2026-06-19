@@ -2,3 +2,5 @@
 /dist/
 .claude/
 .idea/
+# Claude Code superpowers 工作文档（spec/计划等），本地保留不入库
+docs/superpowers/
