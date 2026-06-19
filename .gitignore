@@ -2,7 +2,8 @@
 /dist/
 .claude/
 .idea/
-# Claude Code superpowers 工作文档（spec/计划等），本地保留不入库
+# Claude Code superpowers 工作目录与文档（spec/计划等），本地保留不入库
+.superpowers/
 docs/superpowers/
 
 # SQLite 抓包数据库（运行时生成，不入库）
