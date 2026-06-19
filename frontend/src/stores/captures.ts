@@ -30,6 +30,7 @@ export const useCaptureStore = defineStore('captures', {
       let items: Summary[]
       try {
         const res = await fetch('/api/requests')
+        if (!res.ok) throw new Error(String(res.status))
         items = (await res.json()) as Summary[]
         this.status = 'CAPTURING'
       } catch {

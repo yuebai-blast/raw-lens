@@ -29,6 +29,13 @@ describe('useCaptureStore', () => {
     expect(s.status).toBe('OFFLINE')
   })
 
+  it('refresh HTTP 错误响应（!res.ok）时状态置 OFFLINE', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce([], false))
+    const s = useCaptureStore()
+    await s.refresh()
+    expect(s.status).toBe('OFFLINE')
+  })
+
   it('第二次 refresh 出现的新 id 进入 newIds，老 id 不在', async () => {
     const s = useCaptureStore()
     vi.stubGlobal('fetch', mockFetchOnce(sample))
