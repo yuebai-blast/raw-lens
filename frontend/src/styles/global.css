@@ -88,3 +88,15 @@ body {
 .json-punct   { color: var(--phosphor); opacity: .9; }
 .empty-body   { color: var(--muted); }
 .crlf         { color: var(--violet); opacity: .8; }
+
+/* ---- hint 行 + copy 按钮（各子视图共用，放此处可被 scoped 穿透）---- */
+.hint {
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  margin: 0 0 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.copy {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--ink-dim);
+  background: #0a0f0e; border: 1px solid var(--line); border-radius: 4px;
+  padding: 3px 10px; cursor: pointer; margin-left: auto;
+}
+.copy:hover { color: var(--phosphor); border-color: #234; }

@@ -29,12 +29,14 @@ function copyHeaders() {
     <button class="copy" @click="copyHeaders">{{ copied ? 'COPIED' : 'COPY' }}</button>
   </div>
   <table class="htable">
-    <tr class="reqline"><td class="idx"></td><td class="hname">⟶</td><td class="hval">{{ detail.requestLine }}</td></tr>
-    <tr v-for="(r, i) in rows" :key="i">
-      <td class="idx">{{ i + 1 }}</td>
-      <td class="hname">{{ r.name }}</td>
-      <td class="hval">{{ r.value }}<span v-if="r.dup" class="dupe">DUP·重复名</span></td>
-    </tr>
+    <tbody>
+      <tr class="reqline"><td class="idx"></td><td class="hname">⟶</td><td class="hval">{{ detail.requestLine }}</td></tr>
+      <tr v-for="(r, i) in rows" :key="i">
+        <td class="idx">{{ i + 1 }}</td>
+        <td class="hname">{{ r.name }}</td>
+        <td class="hval">{{ r.value }}<span v-if="r.dup" class="dupe">DUP·重复名</span></td>
+      </tr>
+    </tbody>
   </table>
 </template>
 

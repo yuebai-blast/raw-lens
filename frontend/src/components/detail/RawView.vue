@@ -25,8 +25,6 @@ const segments = computed(() => markCRLFSegments(text.value))
 </template>
 
 <style scoped>
-/* CRLF 高亮符号 */
-.crlf { color: var(--violet); opacity: .8; }
 /* CRLF 显示开关 */
 .toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--ink-dim); user-select: none; }
 .toggle input { accent-color: var(--phosphor); }

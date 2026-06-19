@@ -114,17 +114,4 @@ function at(t: string): string {
 
 /* ---- 内容区 ---- */
 .pane { padding: 20px 24px 40px; }
-
-/* hint 行（各子视图共用，放此处可被穿透；子视图也各自声明 scoped） */
-.hint {
-  font-family: var(--mono); font-size: 11px; color: var(--muted);
-  margin: 0 0 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-}
-/* copy 按钮（各子视图共用，同上） */
-.copy {
-  font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--ink-dim);
-  background: #0a0f0e; border: 1px solid var(--line); border-radius: 4px;
-  padding: 3px 10px; cursor: pointer; margin-left: auto;
-}
-.copy:hover { color: var(--phosphor); border-color: #234; }
 </style>
