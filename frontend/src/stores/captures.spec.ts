@@ -47,6 +47,14 @@ describe('useCaptureStore', () => {
     expect(s.newIds.has(1)).toBe(false)
   })
 
+  it('fetchDetail 网络异常时不抛、置空 current', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
+    const s = useCaptureStore()
+    await s.fetchDetail(1)
+    expect(s.current).toBeNull()
+    expect(s.activeId).toBe(1)
+  })
+
   it('clear 后 list 与 current 清空', async () => {
     const s = useCaptureStore()
     vi.stubGlobal('fetch', mockFetchOnce(sample))

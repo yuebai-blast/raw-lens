@@ -47,12 +47,17 @@ export const useCaptureStore = defineStore('captures', {
     },
     async fetchDetail(id: number) {
       this.activeId = id
-      const res = await fetch('/api/requests/' + id)
-      if (!res.ok) {
+      try {
+        const res = await fetch('/api/requests/' + id)
+        if (!res.ok) {
+          this.current = null
+          return
+        }
+        this.current = (await res.json()) as Detail
+      } catch {
+        // 与 refresh 一致：网络异常时吞掉，置空详情而非向上抛出。
         this.current = null
-        return
       }
-      this.current = (await res.json()) as Detail
     },
     async clear() {
       await fetch('/api/clear', { method: 'POST' })
