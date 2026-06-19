@@ -4,9 +4,11 @@ package dashboard
 import (
 	"encoding/base64"
 	"encoding/json"
+	"io/fs"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/yuebai-blast/raw-lens/internal/store"
@@ -54,8 +56,8 @@ func toSummary(c *store.CapturedRequest) summaryDTO {
 	}
 }
 
-// Serve 在 addr 上提供前端 + API。
-func Serve(addr string, st *store.Store) error {
+// newHandler 组装路由：/api/* 为 JSON API，其余走内嵌前端（SPA fallback）。
+func newHandler(st *store.Store) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/requests", func(w http.ResponseWriter, r *http.Request) {
@@ -95,12 +97,46 @@ func Serve(addr string, st *store.Store) error {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	// 其余路径交给内嵌的前端静态资源（/ 返回 index.html）。
-	files := http.FileServerFS(web.FS)
-	mux.Handle("GET /", files)
+	// 其余路径交给内嵌前端：命中 dist 中的文件就发文件，否则回退 index.html（支持 /r/:id 刷新）。
+	mux.Handle("GET /", spaFileServer())
+	return mux
+}
 
+// spaFileServer 提供内嵌前端的静态资源，未命中文件时回退 index.html（SPA history 模式）。
+// 未构建前端（dist 仅占位、无 index.html）时返回可读的 503 提示而非 panic。
+func spaFileServer() http.Handler {
+	dist, err := web.DistFS()
+	if err != nil {
+		log.Printf("dashboard: 读取内嵌前端失败: %v", err)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "前端资源不可用", http.StatusServiceUnavailable)
+		})
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := strings.TrimPrefix(r.URL.Path, "/")
+		if p == "" {
+			p = "index.html"
+		}
+		if f, ferr := dist.Open(p); ferr == nil {
+			_ = f.Close()
+			http.FileServerFS(dist).ServeHTTP(w, r)
+			return
+		}
+		// 未命中文件 → 回退 index.html。
+		index, ierr := fs.ReadFile(dist, "index.html")
+		if ierr != nil {
+			http.Error(w, "前端未构建，请运行 `mise run build` 后重试。", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write(index)
+	})
+}
+
+// Serve 在 addr 上提供前端 + API。
+func Serve(addr string, st *store.Store) error {
 	log.Printf("dashboard 监听 %s", addr)
-	return http.ListenAndServe(addr, mux)
+	return http.ListenAndServe(addr, newHandler(st))
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
