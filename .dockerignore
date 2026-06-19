@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.claude
+.superpowers
+bin/
+docs/
+*.db
+*.db-wal
+*.db-shm
+frontend/node_modules
+# 保留 embed 占位文件，但不带入宿主机的真实产物（由构建阶段重新生成）
+web/dist/*
+!web/dist/.keep
