@@ -71,7 +71,7 @@ capture:
 ```
 
 ```bash
-mise run run                                   # 按上面的 config.yaml 启动
+mise run api                                   # 按上面的 config.yaml 启动后端
 curl -k https://localhost:8080/secure -d hi    # -k 跳过自签名校验
 ```
 
