@@ -92,6 +92,27 @@ ssh user@server 'rawlens -config /etc/rawlens/config.yaml'   # 或配 systemd
 部署只需二进制 + 一个 yaml（前端已通过 `go:embed` 编进二进制，无需额外文件）。运行时会在启动目录生成 `rawlens.db`（SQLite 持久化文件），可通过 `store.path` 指定路径或设为 `":memory:"` 改为内存模式。
 防火墙放开 8080 给客户端；面板端口 9090 建议只在本机/内网访问（或用 SSH 隧道：`ssh -L 9090:localhost:9090 user@server`）。
 
+## Docker
+
+镜像发布在 GHCR：`ghcr.io/yuebai-blast/raw-lens`（推送 `vX.Y.Z` tag 时由 CI 构建 `linux/amd64,linux/arm64` 多架构镜像）。
+
+```bash
+docker run --rm \
+  -p 8080:8080 \   # 抓包端口（对外）
+  -p 9090:9090 \   # 面板端口（建议只在内网/本机）
+  -v rawlens-data:/data \   # SQLite 抓包库落在 /data，持久化用具名卷
+  ghcr.io/yuebai-blast/raw-lens:latest
+```
+
+- 默认无 `config.yaml` 时使用内置默认值。自定义配置：把本地 `config.yaml` 挂到容器 `/data/config.yaml`：
+  ```bash
+  -v "$(pwd)/config.yaml:/data/config.yaml:ro"
+  ```
+- 镜像以非 root 用户（uid 65532）运行；数据目录 `/data` 已归该用户所有。
+- 本地构建验证：`mise run image`（构建单架构 `rawlens:local`）。
+
+> 首次发布后镜像在 GitHub Packages 默认 private，如需公开拉取，到仓库 Packages 设置里改为 public。
+
 ## 目录结构
 
 标准 Go 布局，前后端分离：
