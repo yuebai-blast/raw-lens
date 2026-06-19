@@ -39,3 +39,7 @@ run = "goreleaser check"
 [tasks.release]
 description = "本地试跑发布快照，不推送（验证打包产物）"
 run = "goreleaser release --snapshot --clean"
+
+[tasks.image]
+description = "本地构建 Docker 镜像（单架构，验证 Dockerfile）"
+run = "docker build -t rawlens:local ."
