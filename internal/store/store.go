@@ -148,6 +148,9 @@ func (s *Store) List() []*CapturedRequest {
 		}
 		out = append(out, cr)
 	}
+	if err := rows.Err(); err != nil {
+		log.Printf("store: 查询迭代失败: %v", err)
+	}
 	// 查询是新→旧，反转成旧→新，保持原内存版语义。
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
 		out[i], out[j] = out[j], out[i]
