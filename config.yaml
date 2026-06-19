@@ -15,4 +15,5 @@ dashboard:
   addr: ":9090"
 
 store:
-  max: 500           # 内存里最多保留多少条请求（环形缓冲，超出丢最旧的）
+  max: 500            # 最多保留多少条请求（超出删最旧）
+  path: "rawlens.db"  # SQLite 文件路径，相对启动目录；填 ":memory:" 则重启即清空

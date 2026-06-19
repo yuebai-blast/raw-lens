@@ -33,7 +33,7 @@ gofmt -l .             # CI 用它判定格式，有输出即失败
 - `parseCaptured` 解析出结构化字段时**保留原始顺序和大小写**，header 值只去掉冒号后惯例的一个前导空格。
 - 改动这里时务必保持「字节保真」这个不变量，不要顺手做任何规范化。
 
-`store.CapturedRequest` 同时保存 `Raw`（全量原始字节）和解析后的结构化字段（`Headers [][2]string` 保序）。`Store` 是带锁的环形缓冲（`store.Max` 条上限，溢出丢最旧），数据仅在内存，进程重启即清空。
+`store.CapturedRequest` 同时保存 `Raw`（全量原始字节）和解析后的结构化字段（`Headers [][2]string` 保序）。`Store` 以 SQLite 持久化（驱动 `modernc.org/sqlite`，纯 Go、保 `CGO_ENABLED=0`），默认落盘到 `rawlens.db`，按条数保留最近 `max` 条（超出删最旧）；`store.path` 配 `":memory:"` 可恢复进程重启即清空的行为。
 
 **TLS 抓包**（`internal/capture/tls.go`）：`tls.NewListener` 包一层后，握手由 raw-lens 终结，从 `tls.Conn` 读到的是**解密后的明文字节**，所以下游解析逻辑完全复用，无需区分 HTTP/HTTPS。`cert`/`key` 留空时生成内存自签名证书。
 

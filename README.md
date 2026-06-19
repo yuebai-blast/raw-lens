@@ -36,10 +36,11 @@ capture:
 dashboard:
   addr: ":9090"        # 前端面板监听地址，建议只在内网/本机访问
 store:
-  max: 500             # 内存里最多保留多少条请求（环形缓冲，超出丢最旧的）
+  max: 500             # 最多保留多少条请求（超出删最旧）
+  path: "rawlens.db"  # SQLite 文件路径，相对启动目录；":memory:" 则重启即清空
 ```
 
-`-config` 是唯一的命令行 flag。请求只存在内存里，进程重启即清空。
+`-config` 是唯一的命令行 flag。请求默认落盘到 `rawlens.db` 持久化，进程重启后记录不丢失；如需重启即清空的旧行为，将 `store.path` 配为 `":memory:"`。
 
 ## 抓 HTTPS 原始请求
 
@@ -72,7 +73,7 @@ scp config.yaml user@server:/etc/rawlens/config.yaml
 ssh user@server 'rawlens -config /etc/rawlens/config.yaml'   # 或配 systemd
 ```
 
-部署只需两个文件：二进制 + `config.yaml`（前端已编进二进制）。
+部署只需两个文件：二进制 + `config.yaml`（前端已编进二进制）。运行时会在启动目录生成 `rawlens.db`（SQLite 持久化文件），可通过 `store.path` 指定路径或设为 `":memory:"` 改为内存模式。
 防火墙放开 8080 给客户端；面板端口 9090 建议只在本机/内网访问（或用 SSH 隧道：`ssh -L 9090:localhost:9090 user@server`）。
 
 ## 目录结构
