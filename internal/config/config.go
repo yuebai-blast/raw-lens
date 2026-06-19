@@ -32,7 +32,8 @@ type Dashboard struct {
 }
 
 type Store struct {
-	Max int `yaml:"max"` // 内存里最多保留多少条请求
+	Max  int    `yaml:"max"`  // 最多保留多少条请求（超出删最旧）
+	Path string `yaml:"path"` // SQLite 文件路径；":memory:" 为内存库（重启即清空）
 }
 
 type Config struct {
@@ -46,7 +47,7 @@ func Default() *Config {
 	return &Config{
 		Capture:   Capture{Addr: ":8080"},
 		Dashboard: Dashboard{Addr: ":9090"},
-		Store:     Store{Max: 500},
+		Store:     Store{Max: 500, Path: "rawlens.db"},
 	}
 }
 
@@ -66,6 +67,9 @@ func Load(path string) (*Config, bool, error) {
 	}
 	if cfg.Store.Max <= 0 {
 		cfg.Store.Max = 500
+	}
+	if cfg.Store.Path == "" {
+		cfg.Store.Path = "rawlens.db"
 	}
 	return cfg, true, nil
 }
