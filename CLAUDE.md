@@ -6,19 +6,24 @@ raw-lens 是一个**保真**的 HTTP 请求观察工具：直接监听裸 TCP/TL
 
 ## 常用命令
 
-工具版本由 `mise.toml` 固定（Go 1.26.4），优先用 mise 任务：
+工具版本由 `mise.toml` 固定（Go 1.26.4、Node 20、pnpm 9），优先用 mise 任务：
 
 ```bash
-mise run run           # 本地运行（= go run ./cmd/rawlens，读 ./config.yaml）
-mise run build         # 构建本机二进制到 bin/rawlens
+mise run install       # 安装全部依赖（go mod download + pnpm install）
+mise run api           # 本地启动后端（= go run ./cmd/rawlens，监听 :8080/:9090）
+mise run webui         # 本地启动 Vite 开发服务器（HMR，/api 代理到 :9090）
+mise run build         # 前端 pnpm build 后构建本机二进制到 bin/rawlens
 mise run build-linux   # 交叉编译 linux/amd64 部署产物（CGO_ENABLED=0）
-go test ./...          # 运行全部测试
-go test ./internal/capture -run TestXxx   # 跑单个测试
+mise run test-web      # 前端质量检查（typecheck + lint + vitest）
+go test ./...          # 运行全部 Go 测试
+go test ./internal/capture -run TestXxx   # 跑单个 Go 测试
 go vet ./...           # CI 会跑
 gofmt -l .             # CI 用它判定格式，有输出即失败
 ```
 
-提交前确保 `gofmt -l .` 无输出、`go vet ./...` 和 `go test ./...` 通过——CI（`.github/workflows/ci.yml`）会逐项检查，外加 `goreleaser check`。
+本地开发双进程流程：先 `mise run api` 启动后端，再 `mise run webui` 启动 Vite（`http://localhost:5173`），Vite 会把 `/api/*` 代理到后端 `:9090`，前端改动 HMR 即时生效，无需重启后端。
+
+提交前确保 `gofmt -l .` 无输出、`go vet ./...` 和 `go test ./...` 通过——CI（`.github/workflows/ci.yml`）会逐项检查，外加前端 typecheck/lint/test 和 `goreleaser check`。
 
 ## 架构要点
 
@@ -39,7 +44,7 @@ gofmt -l .             # CI 用它判定格式，有输出即失败
 
 **连接模型**：每条连接处理一条请求，响应带 `Connection: close`，不做 keep-alive 复用。读超时 30s。
 
-**前端零构建**（`web/`）：原生 HTML/CSS/JS，通过 `web/embed.go` 的 `go:embed` 编进二进制，部署无需额外文件。`dashboard.go` 提供 JSON API（`GET /api/requests`、`GET /api/requests/{id}`、`POST /api/clear`）并托管静态资源；`Raw`/`Body` 经 base64 传给前端，前端提供 RAW/HEADERS/BODY/HEX 四视图。改完前端直接重新编译即可。
+**前端架构**（`frontend/` → `web/dist/`）：前端是 Vue 3 + TypeScript + Vite + Pinia + Vue Router 项目，源码在 `frontend/src/`（App.vue、router、stores/captures.ts、components/、views/、utils/、types/、styles/global.css）。`pnpm build`（即 `mise run build` 的前半段）将产物输出到 `web/dist/`，再由 `web/embed.go` 的 `//go:embed all:dist` 编进 Go 二进制；`web/dist/.keep` 已提交，保证不构建前端时 `go build/test/vet ./...` 也能通过。`dashboard.go` 提供 JSON API（`GET /api/requests`、`GET /api/requests/{id}`、`POST /api/clear`）+ SPA fallback（非 API、非静态文件路径一律返回 index.html，使 `/r/:id` 刷新可用）；`Raw`/`Body` 经 base64 传给前端，前端提供 RAW/HEADERS/BODY/HEX 四视图。改前端后需重新 `mise run build` 才能更新内嵌产物；日常开发用双进程流程（见"常用命令"）。
 
 ## 配置
 

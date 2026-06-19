@@ -1,0 +1,1 @@
+占位文件：保证 //go:embed all:dist 在未构建前端时仍有匹配项，CI 的 go build/test/vet 不致失败。真实前端产物由 `mise run build` 生成并覆盖。

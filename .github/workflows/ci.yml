@@ -42,6 +42,19 @@ jobs:
       - name: Run vet
         run: go vet ./...
 
+      # 前端依赖（node_modules）不在仓库里，必须在 build/test 之前安装
+      - name: Install frontend dependencies
+        run: pnpm -C frontend install --frozen-lockfile
+
+      - name: Frontend typecheck
+        run: pnpm -C frontend typecheck
+
+      - name: Frontend lint
+        run: pnpm -C frontend lint
+
+      - name: Frontend tests
+        run: pnpm -C frontend test
+
       - name: Build
         run: mise run build
 
