@@ -2,21 +2,35 @@
 # 运行时配置（端口、TLS 等）不放这里——见 README，用 flag 或进程环境变量。
 [tools]
 go = "1.26.4"
+node = "20.18.1"
+pnpm = "9.15.9"
 # 发布工具：CI 的 release 与 release-check 都靠它，锁定版本保证可复现
 goreleaser = "2.16.0"
 
-[tasks.run]
-description = "本地运行（读 ./config.yaml）"
+[tasks.install]
+description = "安装全部依赖（Go 模块 + 前端 pnpm）"
+run = ["go mod download", "pnpm -C frontend install"]
+
+[tasks.api]
+description = "本地运行后端（提供 /api 与面板，读 ./config.yaml）"
 run = "go run ./cmd/rawlens"
 
+[tasks.webui]
+description = "本地运行前端 Vite dev server（HMR，proxy /api 到 :9090）"
+run = "pnpm -C frontend dev"
+
 [tasks.build]
-description = "编译成单二进制 ./bin/rawlens"
-run = "go build -o bin/rawlens ./cmd/rawlens"
+description = "构建前端并编译单二进制到 bin/rawlens"
+run = ["pnpm -C frontend build", "go build -o bin/rawlens ./cmd/rawlens"]
 
 [tasks.build-linux]
-description = "交叉编译 linux/amd64，部署到服务器用"
+description = "构建前端并交叉编译 linux/amd64 部署产物（CGO_ENABLED=0）"
 env = { GOOS = "linux", GOARCH = "amd64", CGO_ENABLED = "0" }
-run = "go build -o bin/rawlens-linux-amd64 ./cmd/rawlens"
+run = ["pnpm -C frontend build", "go build -o bin/rawlens-linux-amd64 ./cmd/rawlens"]
+
+[tasks.test-web]
+description = "前端检查：typecheck + lint + vitest"
+run = ["pnpm -C frontend typecheck", "pnpm -C frontend lint", "pnpm -C frontend test"]
 
 [tasks.release-check]
 description = "校验 .goreleaser.yaml 配置（CI 会跑）"
