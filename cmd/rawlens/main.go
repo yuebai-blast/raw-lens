@@ -25,7 +25,16 @@ func main() {
 		log.Printf("未找到 %s，使用内置默认值", *configPath)
 	}
 
-	st := store.New(cfg.Store.Max)
+	st, err := store.New(store.Options{Path: cfg.Store.Path, Max: cfg.Store.Max})
+	if err != nil {
+		log.Fatalf("存储: %v", err)
+	}
+	defer st.Close()
+	if cfg.Store.Path == ":memory:" {
+		log.Printf("存储：内存模式（进程重启即清空）")
+	} else {
+		log.Printf("存储：SQLite 文件 %s（最多保留 %d 条）", cfg.Store.Path, cfg.Store.Max)
+	}
 
 	var tlsConf *tls.Config
 	if cfg.Capture.TLS.Enabled {

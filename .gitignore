@@ -4,3 +4,8 @@
 .idea/
 # Claude Code superpowers 工作文档（spec/计划等），本地保留不入库
 docs/superpowers/
+
+# SQLite 抓包数据库（运行时生成，不入库）
+*.db
+*.db-wal
+*.db-shm
