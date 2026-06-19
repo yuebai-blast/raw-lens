@@ -7,5 +7,8 @@ module.exports = {
     '@vue/eslint-config-typescript',
   ],
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
-  rules: {},
+  rules: {
+    // 允许单词组件名（Masthead / SignalLog 等设计系统组件）
+    'vue/multi-word-component-names': 'off',
+  },
 }
