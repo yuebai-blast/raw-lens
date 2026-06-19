@@ -26,15 +26,38 @@ function copyHeaders() {
 <template>
   <div class="hint">
     按收到顺序排列，header 名保留原始大小写，重复名不合并
-    <button class="copy" @click="copyHeaders">{{ copied ? 'COPIED' : 'COPY' }}</button>
+    <button
+      class="copy"
+      @click="copyHeaders"
+    >
+      {{ copied ? 'COPIED' : 'COPY' }}
+    </button>
   </div>
   <table class="htable">
     <tbody>
-      <tr class="reqline"><td class="idx"></td><td class="hname">⟶</td><td class="hval">{{ detail.requestLine }}</td></tr>
-      <tr v-for="(r, i) in rows" :key="i">
-        <td class="idx">{{ i + 1 }}</td>
-        <td class="hname">{{ r.name }}</td>
-        <td class="hval">{{ r.value }}<span v-if="r.dup" class="dupe">DUP·重复名</span></td>
+      <tr class="reqline">
+        <td class="idx" /><td class="hname">
+          ⟶
+        </td><td class="hval">
+          {{ detail.requestLine }}
+        </td>
+      </tr>
+      <tr
+        v-for="(r, i) in rows"
+        :key="i"
+      >
+        <td class="idx">
+          {{ i + 1 }}
+        </td>
+        <td class="hname">
+          {{ r.name }}
+        </td>
+        <td class="hval">
+          {{ r.value }}<span
+            v-if="r.dup"
+            class="dupe"
+          >DUP·重复名</span>
+        </td>
       </tr>
     </tbody>
   </table>

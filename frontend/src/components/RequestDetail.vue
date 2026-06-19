@@ -21,37 +21,91 @@ function at(t: string): string {
     <template v-if="d">
       <div class="detail-bar">
         <div class="detail-line">
-          <span class="chip" :data-m="d.method || '?'">{{ d.method || '?' }}</span>
+          <span
+            class="chip"
+            :data-m="d.method || '?'"
+          >{{ d.method || '?' }}</span>
           <span class="detail-target">{{ d.target || '/' }}</span>
           <span class="detail-proto">{{ d.proto }}</span>
         </div>
         <div class="detail-meta">
           <span><b>#</b>{{ d.id }}</span>
           <span><b>FROM</b> {{ d.remoteAddr }}</span>
-          <span><span v-if="d.tls" class="tls-on">🔒 TLS</span><span v-else>明文 cleartext</span></span>
+          <span><span
+            v-if="d.tls"
+            class="tls-on"
+          >🔒 TLS</span><span v-else>明文 cleartext</span></span>
           <span><b>HEADERS</b> {{ d.headerCount }}</span>
           <span><b>BODY</b> {{ fmtBytes(d.bodySize) }}</span>
           <span><b>RAW</b> {{ fmtBytes(d.rawSize) }}</span>
           <span><b>AT</b> {{ at(d.time) }}</span>
         </div>
         <div class="tabs">
-          <div class="tab" :class="{ active: tab === 'raw' }" @click="tab = 'raw'">RAW</div>
-          <div class="tab" :class="{ active: tab === 'headers' }" @click="tab = 'headers'">HEADERS</div>
-          <div class="tab" :class="{ active: tab === 'body' }" @click="tab = 'body'">BODY</div>
-          <div class="tab" :class="{ active: tab === 'hex' }" @click="tab = 'hex'">HEX</div>
+          <div
+            class="tab"
+            :class="{ active: tab === 'raw' }"
+            @click="tab = 'raw'"
+          >
+            RAW
+          </div>
+          <div
+            class="tab"
+            :class="{ active: tab === 'headers' }"
+            @click="tab = 'headers'"
+          >
+            HEADERS
+          </div>
+          <div
+            class="tab"
+            :class="{ active: tab === 'body' }"
+            @click="tab = 'body'"
+          >
+            BODY
+          </div>
+          <div
+            class="tab"
+            :class="{ active: tab === 'hex' }"
+            @click="tab = 'hex'"
+          >
+            HEX
+          </div>
         </div>
       </div>
       <div class="pane">
-        <RawView v-if="tab === 'raw'" :detail="d" />
-        <HeadersView v-else-if="tab === 'headers'" :detail="d" />
-        <BodyView v-else-if="tab === 'body'" :detail="d" />
-        <HexView v-else :detail="d" />
+        <RawView
+          v-if="tab === 'raw'"
+          :detail="d"
+        />
+        <HeadersView
+          v-else-if="tab === 'headers'"
+          :detail="d"
+        />
+        <BodyView
+          v-else-if="tab === 'body'"
+          :detail="d"
+        />
+        <HexView
+          v-else
+          :detail="d"
+        />
       </div>
     </template>
-    <div v-else class="awaiting">
-      <div class="awaiting-art" aria-hidden="true">⌁ ⌁ ⌁</div>
-      <p class="awaiting-title">AWAITING SIGNAL<span class="cursor">▌</span></p>
-      <p class="awaiting-sub">把请求发到抓包端口，原始字节会在此显形<br>顺序 · 大小写 · 重复 header · body —— 一字不改</p>
+    <div
+      v-else
+      class="awaiting"
+    >
+      <div
+        class="awaiting-art"
+        aria-hidden="true"
+      >
+        ⌁ ⌁ ⌁
+      </div>
+      <p class="awaiting-title">
+        AWAITING SIGNAL<span class="cursor">▌</span>
+      </p>
+      <p class="awaiting-sub">
+        把请求发到抓包端口，原始字节会在此显形<br>顺序 · 大小写 · 重复 header · body —— 一字不改
+      </p>
     </div>
   </section>
 </template>
