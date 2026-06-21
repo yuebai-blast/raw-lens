@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-raw-lens 是一个**保真**的 HTTP 请求观察工具：直接监听裸 TCP/TLS，不经过 `net/http` 路由层，逐字节读 socket，因此能保留客户端真正发出的 header 顺序、大小写、重复项和原始 body。详细用法见 `README.md`，贡献规范见 `AGENTS.md`。
+raw-lens 是一个**保真**的 HTTP 请求观察工具：直接监听裸 TCP/TLS，不经过 `net/http` 路由层，逐字节读 socket，因此能保留客户端真正发出的 header 顺序、大小写、重复项和原始 body。详细用法见 `README.md`。
 
 ## 常用命令
 
