@@ -51,4 +51,4 @@ gofmt -l .             # CI 用它判定格式，有输出即失败
 
 ## 配置
 
-所有运行时配置走 `config.yaml`（`internal/config/config.go`：文件不存在用内置默认值，存在则字段覆盖）。`-config /path/to.yaml` 是唯一的命令行 flag。部署只需二进制 + 一个 yaml。
+所有运行时配置走 `config.yaml`（`internal/config/config.go`：文件不存在用内置默认值，存在则字段覆盖）。`-config /path/to.yaml` 是唯一的命令行 flag。部署只需二进制 + 一个 yaml。仓库里只提交模板 `config.example.yaml`，实际的 `config.yaml` 由各环境从模板复制而来、已在 `.gitignore` 中不入库（程序默认仍读 `config.yaml`，`config.go` 的 `DefaultPath` 不变）。

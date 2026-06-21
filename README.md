@@ -39,7 +39,7 @@ curl -X POST localhost:8080/hi -d 'hello'
 
 ## 配置
 
-所有运行时配置走 `config.yaml`（启动时默认读当前目录的 `config.yaml`，或用 `-config /path/to.yaml` 指定）。文件不存在时使用内置默认值，只需写你想改的字段。
+所有运行时配置走 `config.yaml`（启动时默认读当前目录的 `config.yaml`，或用 `-config /path/to.yaml` 指定）。文件不存在时使用内置默认值，只需写你想改的字段。仓库提供 `config.example.yaml` 模板，复制一份再按需修改即可：`cp config.example.yaml config.yaml`。
 
 ```yaml
 capture:
@@ -85,6 +85,7 @@ curl -k https://localhost:8080/secure -d hi    # -k 跳过自签名校验
 mise run build              # 先构建前端（pnpm build），再编译 Go 二进制到 bin/rawlens
 mise run build-linux        # 或：交叉编译 linux/amd64 产物 bin/rawlens-linux-amd64
 scp bin/rawlens-linux-amd64 user@server:/usr/local/bin/rawlens
+cp config.example.yaml config.yaml                           # 首次：从模板复制再按需修改
 scp config.yaml user@server:/etc/rawlens/config.yaml
 ssh user@server 'rawlens -config /etc/rawlens/config.yaml'   # 或配 systemd
 ```
@@ -104,7 +105,7 @@ docker run --rm \
   ghcr.io/yuebai-blast/raw-lens:latest
 ```
 
-- 默认无 `config.yaml` 时使用内置默认值。自定义配置：把本地 `config.yaml` 挂到容器 `/data/config.yaml`：
+- 默认无 `config.yaml` 时使用内置默认值。自定义配置：从 `config.example.yaml` 复制一份本地 `config.yaml`，挂到容器 `/data/config.yaml`：
   ```bash
   -v "$(pwd)/config.yaml:/data/config.yaml:ro"
   ```
@@ -118,7 +119,7 @@ docker run --rm \
 标准 Go 布局，前后端分离：
 
 ```
-config.yaml                  运行时配置（端口 / TLS / 容量），外置可编辑
+config.example.yaml          运行时配置模板（端口 / TLS / 容量），复制为 config.yaml 后编辑
 cmd/rawlens/main.go          入口：加载配置、起两个 server
 internal/
   config/config.go           YAML 配置加载（默认值 + 文件覆盖）
