@@ -1,29 +1,38 @@
 # syntax=docker/dockerfile:1
 
-# 阶段 1：构建前端 → /src/web/dist（vite outDir = ../web/dist）
-FROM node:20.18.1-bookworm-slim AS web
+# ---- 构建阶段：干净 slim 底座 + curl 装 mise，工具链版本全由根 mise.toml 决定 ----
+# 不用 node:/golang: 这类带运行时的基础镜像（会把版本钉死在 Dockerfile，绕过 mise.toml 单一来源）
+FROM debian:12-slim AS build
+
+# mise 自身版本在此钉死——自举工具无法由 mise.toml 管，这是 Dockerfile 里唯一允许的版本钉死
+ENV MISE_VERSION=v2026.6.0
+ENV MISE_DATA_DIR=/mise MISE_CONFIG_DIR=/mise MISE_CACHE_DIR=/mise/cache \
+    MISE_INSTALL_PATH=/usr/local/bin/mise PATH=/mise/shims:$PATH
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl git ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl https://mise.run | sh
+
 WORKDIR /src
-RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
-# 先装依赖，利用层缓存：lockfile 不变则不重装
+# 工具链版本唯一来源：根 mise.toml；只装本镜像需要的 go/node/pnpm，不 `mise install` 全装
+COPY mise.toml ./
+RUN mise trust && mise install go node pnpm
+
+# 层缓存：依赖清单先于源码 COPY，清单不变则不重装（见 monorepo-docker-build.md §6）
+# 1) 前端依赖（pnpm-lock.yaml 不变则命中缓存）
 COPY frontend/package.json frontend/pnpm-lock.yaml ./frontend/
 RUN pnpm -C frontend install --frozen-lockfile
-COPY frontend/ ./frontend/
-RUN pnpm -C frontend build
-
-# 阶段 2：编译内嵌前端产物的单二进制（CGO_ENABLED=0 纯 Go）
-FROM golang:1.26.4-bookworm AS build
-WORKDIR /src
-ENV CGO_ENABLED=0
+# 2) Go 依赖（go.mod/go.sum 不变则命中缓存）
 COPY go.mod go.sum ./
 RUN go mod download
-COPY . .
-# 用阶段 1 的真实前端产物覆盖占位 dist，保证 embed 拿到完整面板
-COPY --from=web /src/web/dist ./web/dist
-# 顺便建好运行时数据目录，供下一阶段带属主拷贝
-RUN mkdir -p /data \
- && go build -trimpath -ldflags="-s -w" -o /out/rawlens ./cmd/rawlens
 
-# 阶段 3：distroless 非 root 运行
+# 3) 拷源码：先前端 build 出 web/dist，再 CGO_ENABLED=0 纯 Go 编译把它 embed 进单二进制
+COPY . .
+RUN pnpm -C frontend build \
+ && mkdir -p /data \
+ && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/rawlens ./cmd/rawlens
+
+# ---- 运行阶段：distroless 非 root，只带二进制，构建期的 mise/工具链都不进最终镜像 ----
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/rawlens /usr/local/bin/rawlens
 # /data 归非 root 用户所有，rawlens.db 才可写
