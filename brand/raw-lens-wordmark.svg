@@ -1,0 +1,29 @@
+<svg width="520" height="132" viewBox="0 0 520 132" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="raw·lens — wire-level http inspector">
+  <!-- 横向锁定组合：光圈标记（垂直居中）+ raw·lens 字标 + 一句话定位。最终交付前建议把文字转曲（outline）。 -->
+  <defs>
+    <filter id="wg" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- 标记：中心置于 (50,66)，scale 1.5 → 外圈 r33，垂直居中、左留白 17 -->
+  <g transform="translate(50,66) scale(1.5) translate(-32,-32)" filter="url(#wg)">
+    <g fill="none" stroke="#34e0a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="32" cy="32" r="22" stroke-opacity="0.45"/>
+      <polygon points="32,22 23.34,27 23.34,37 32,42 40.66,37 40.66,27"/>
+      <line x1="32" y1="22" x2="15.55" y2="22.5"/>
+      <line x1="23.34" y1="27" x2="15.55" y2="41.5"/>
+      <line x1="23.34" y1="37" x2="32" y2="51"/>
+      <line x1="32" y1="42" x2="48.45" y2="41.5"/>
+      <line x1="40.66" y1="37" x2="48.45" y2="22.5"/>
+      <line x1="40.66" y1="27" x2="32" y2="13"/>
+    </g>
+    <circle cx="32" cy="32" r="2.4" fill="#34e0a1"/>
+  </g>
+  <!-- 字标 + 定位：左端统一对齐 x=118，三行竖直居中于标记 -->
+  <g font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <text x="118" y="58" font-size="40" font-weight="500" letter-spacing="1" fill="#cfe3da">raw<tspan fill="#34e0a1">·</tspan>lens</text>
+    <text x="120" y="82" font-size="11" letter-spacing="4" fill="#4d615a">WIRE-LEVEL HTTP INSPECTOR</text>
+    <text x="120" y="106" font-size="12" letter-spacing="0.5" fill="#88a096">the bytes, as sent <tspan fill="#a394f2" letter-spacing="2">0D 0A</tspan></text>
+  </g>
+</svg>

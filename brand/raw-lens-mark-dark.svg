@@ -1,0 +1,22 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="raw·lens">
+  <!-- 深底版（主标志）：发光的光圈绿叶片 + 绿色中心字节，= 产品内已落地的标记 -->
+  <defs>
+    <filter id="g" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g transform="translate(48,48) scale(1.55) translate(-32,-32)" filter="url(#g)">
+    <g fill="none" stroke="#34e0a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="32" cy="32" r="22" stroke-opacity="0.45"/>
+      <polygon points="32,22 23.34,27 23.34,37 32,42 40.66,37 40.66,27"/>
+      <line x1="32" y1="22" x2="15.55" y2="22.5"/>
+      <line x1="23.34" y1="27" x2="15.55" y2="41.5"/>
+      <line x1="23.34" y1="37" x2="32" y2="51"/>
+      <line x1="32" y1="42" x2="48.45" y2="41.5"/>
+      <line x1="40.66" y1="37" x2="48.45" y2="22.5"/>
+      <line x1="40.66" y1="27" x2="32" y2="13"/>
+    </g>
+    <circle cx="32" cy="32" r="2.6" fill="#34e0a1"/>
+  </g>
+</svg>

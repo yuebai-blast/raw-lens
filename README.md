@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/brand/raw-lens-lockup.svg" alt="raw·lens — wire-level http inspector" width="520">
+  <img src="brand/raw-lens-wordmark.svg" alt="raw·lens — wire-level http inspector" width="520">
 </p>
 
 # raw-lens

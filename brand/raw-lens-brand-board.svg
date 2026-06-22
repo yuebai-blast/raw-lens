@@ -1,0 +1,101 @@
+<svg width="1280" height="800" viewBox="0 0 1280 800" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="raw·lens 品牌标志板">
+  <defs>
+    <!-- 可复用光圈叶片（64 坐标系，颜色由调用方设定）-->
+    <g id="ap" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="32" cy="32" r="22" stroke-opacity="0.45"/>
+      <polygon points="32,22 23.34,27 23.34,37 32,42 40.66,37 40.66,27"/>
+      <line x1="32" y1="22" x2="15.55" y2="22.5"/>
+      <line x1="23.34" y1="27" x2="15.55" y2="41.5"/>
+      <line x1="23.34" y1="37" x2="32" y2="51"/>
+      <line x1="32" y1="42" x2="48.45" y2="41.5"/>
+      <line x1="40.66" y1="37" x2="48.45" y2="22.5"/>
+      <line x1="40.66" y1="27" x2="32" y2="13"/>
+    </g>
+    <radialGradient id="tile" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#12201b"/><stop offset="1" stop-color="#070a09"/>
+    </radialGradient>
+    <filter id="bg" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      .panel{fill:#0d1513;stroke:#1c2723;stroke-width:1;}
+      .lbl{font-family:'IBM Plex Mono',ui-monospace,monospace;fill:#4d615a;font-size:12px;letter-spacing:2px;}
+      .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;}
+    </style>
+  </defs>
+
+  <!-- 画布 -->
+  <rect width="1280" height="800" fill="#070a09"/>
+
+  <!-- 页眉 -->
+  <text x="48" y="62" class="mono" font-size="20" font-weight="500" letter-spacing="1" fill="#cfe3da">raw<tspan fill="#34e0a1">·</tspan>lens</text>
+  <text x="1232" y="62" text-anchor="end" class="lbl">WIRE-LEVEL HTTP INSPECTOR</text>
+  <line x1="48" y1="84" x2="1232" y2="84" stroke="#1c2723" stroke-width="1"/>
+
+  <!-- 行1 ───────────────────────────────── -->
+  <!-- 01 标志 -->
+  <rect class="panel" x="48" y="112" width="373" height="304" rx="14"/>
+  <text x="68" y="142" class="lbl">01 — LOGOTYPE</text>
+  <g transform="translate(234.5,212) scale(2) translate(-32,-32)" filter="url(#bg)">
+    <use href="#ap" stroke="#34e0a1"/>
+    <circle cx="32" cy="32" r="2.4" fill="#34e0a1"/>
+  </g>
+  <text x="234.5" y="392" text-anchor="middle" class="mono" font-size="30" font-weight="500" letter-spacing="1" fill="#cfe3da">raw<tspan fill="#34e0a1">·</tspan>lens</text>
+
+  <!-- 02 构成 -->
+  <rect class="panel" x="453" y="112" width="373" height="304" rx="14"/>
+  <text x="473" y="142" class="lbl">02 — CONSTRUCTION</text>
+  <g transform="translate(639.5,228) scale(2.6) translate(-32,-32)">
+    <rect x="10" y="10" width="44" height="44" fill="none" stroke="#1f2d28" stroke-width="0.5"/>
+    <line x1="32" y1="6" x2="32" y2="58" stroke="#1f2d28" stroke-width="0.5"/>
+    <line x1="6" y1="32" x2="58" y2="32" stroke="#1f2d28" stroke-width="0.5"/>
+    <circle cx="32" cy="32" r="22" fill="none" stroke="#244d40" stroke-width="0.6" stroke-dasharray="2 2"/>
+    <use href="#ap" stroke="#34e0a1"/>
+    <line x1="32" y1="32" x2="32" y2="10" stroke="#a394f2" stroke-width="0.5"/>
+    <circle cx="32" cy="32" r="2.4" fill="#a394f2"/>
+  </g>
+  <text x="473" y="392" class="mono" font-size="12" fill="#88a096">圆=镜头 · ⬡=光圈叶片 · <tspan fill="#a394f2">•</tspan>=被对准的字节</text>
+
+  <!-- 03 应用图标 -->
+  <rect class="panel" x="858" y="112" width="373" height="304" rx="14"/>
+  <text x="878" y="142" class="lbl">03 — APP ICON</text>
+  <g transform="translate(954.5,168) scale(0.352)">
+    <rect width="512" height="512" rx="114" fill="url(#tile)" stroke="#1c2723" stroke-width="3"/>
+    <g transform="translate(256,256) scale(5.4) translate(-32,-32)" filter="url(#bg)">
+      <use href="#ap" stroke="#34e0a1"/>
+      <circle cx="32" cy="32" r="2.4" fill="#34e0a1"/>
+    </g>
+  </g>
+
+  <!-- 行2 ───────────────────────────────── -->
+  <!-- 04 色彩 -->
+  <rect class="panel" x="48" y="448" width="373" height="304" rx="14"/>
+  <text x="68" y="478" class="lbl">04 — COLOR</text>
+  <g class="mono" font-size="13" font-weight="500">
+    <rect x="68" y="500" width="333" height="62" rx="8" fill="#34e0a1"/>
+    <text x="88" y="536" fill="#053a27">光圈绿 Aperture</text><text x="381" y="536" text-anchor="end" fill="#0a4a32">#34E0A1</text>
+    <rect x="68" y="572" width="333" height="62" rx="8" fill="#a394f2"/>
+    <text x="88" y="608" fill="#241a4a">字节紫 Byte</text><text x="381" y="608" text-anchor="end" fill="#352a63">#A394F2</text>
+    <rect x="68" y="644" width="333" height="62" rx="8" fill="#070a09" stroke="#2a3a33" stroke-width="1"/>
+    <text x="88" y="680" fill="#cfe3da">炭黑 Canvas</text><text x="381" y="680" text-anchor="end" fill="#88a096">#070A09</text>
+  </g>
+
+  <!-- 05 字标组合 -->
+  <rect class="panel" x="453" y="448" width="373" height="304" rx="14"/>
+  <text x="473" y="478" class="lbl">05 — LOCKUP</text>
+  <g transform="translate(523,580) scale(1.5) translate(-32,-32)" filter="url(#bg)">
+    <use href="#ap" stroke="#34e0a1"/>
+    <circle cx="32" cy="32" r="2.4" fill="#34e0a1"/>
+  </g>
+  <text x="585" y="588" class="mono" font-size="34" font-weight="500" letter-spacing="1" fill="#cfe3da">raw<tspan fill="#34e0a1">·</tspan>lens</text>
+  <text x="586" y="616" class="mono" font-size="11" letter-spacing="3" fill="#4d615a">WIRE-LEVEL HTTP INSPECTOR</text>
+  <text x="586" y="646" class="mono" font-size="13" fill="#88a096">the bytes, as sent <tspan fill="#a394f2" letter-spacing="2">0D 0A</tspan></text>
+
+  <!-- 06 主张 -->
+  <rect class="panel" x="858" y="448" width="373" height="304" rx="14"/>
+  <text x="878" y="478" class="lbl">06 — ESSENCE</text>
+  <text x="878" y="582" class="mono" font-size="44" font-weight="500" fill="#cfe3da">the bytes,</text>
+  <text x="878" y="642" class="mono" font-size="44" font-weight="500" fill="#cfe3da">as <tspan fill="#34e0a1">sent</tspan>.</text>
+  <text x="878" y="712" class="lbl">NO NORMALIZE · NO REORDER · NO DEDUPE</text>
+</svg>
