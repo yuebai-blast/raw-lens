@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/yuebai-blast/raw-lens/internal/config"
 	"github.com/yuebai-blast/raw-lens/internal/store"
 )
 
@@ -20,7 +21,7 @@ func newTestStore(t *testing.T) *store.Store {
 
 // /api/* 不被静态层拦截：未知 id 应由 API handler 返回 404，而非回退 index.html。
 func TestAPIRouteNotSwallowedBySPAFallback(t *testing.T) {
-	h := newHandler(newTestStore(t))
+	h := newHandler(newTestStore(t), config.Auth{})
 	req := httptest.NewRequest(http.MethodGet, "/api/requests/999999", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -34,7 +35,7 @@ func TestAPIRouteNotSwallowedBySPAFallback(t *testing.T) {
 
 // 未构建前端（dist 仅占位）时，非 API 路径应给出可读提示而非 panic / 500 空响应。
 func TestSPAFallbackWhenFrontendNotBuilt(t *testing.T) {
-	h := newHandler(newTestStore(t))
+	h := newHandler(newTestStore(t), config.Auth{})
 	for _, path := range []string{"/", "/r/123"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
@@ -50,7 +51,7 @@ func TestSPAFallbackWhenFrontendNotBuilt(t *testing.T) {
 
 // /api/requests 正常返回 JSON 数组。
 func TestAPIRequestsStillJSON(t *testing.T) {
-	h := newHandler(newTestStore(t))
+	h := newHandler(newTestStore(t), config.Auth{})
 	req := httptest.NewRequest(http.MethodGet, "/api/requests", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
