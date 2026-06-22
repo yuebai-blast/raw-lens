@@ -22,7 +22,7 @@
 
 services:
   rawlens:
-    image: ghcr.io/yuebai-blast/raw-lens:latest
+    image: ghcr.io/yuebai-blast/raw-lens:${RAWLENS_TAG:-latest}
     container_name: rawlens
     restart: unless-stopped
     ports:
