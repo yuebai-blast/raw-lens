@@ -39,6 +39,9 @@ COPY --from=build /out/rawlens /usr/local/bin/rawlens
 COPY --from=build --chown=65532:65532 /data /data
 WORKDIR /data
 USER 65532:65532
+# EXPOSE 仅为元数据/文档，不发布也不绑定端口；这里标的是内置默认端口
+# （capture :8080 / dashboard :9090）。实际监听端口由 config.yaml 决定，
+# 改了配置请以配置为准，并自行用 docker run -p 映射对应端口。
 EXPOSE 8080 9090
 # 默认无 config.yaml → 内置默认值；自定义配置挂到 /data/config.yaml 即被读取
 ENTRYPOINT ["/usr/local/bin/rawlens"]
