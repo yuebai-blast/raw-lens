@@ -10,21 +10,27 @@ permissions:
   contents: read
   packages: write # 推送到 GHCR 所需
 
-# 与 release 一样串行、禁止取消，避免两次 tag 同时推镜像互相覆盖
+# 串行、禁止取消，避免两次 tag 同时推镜像互相覆盖
 concurrency:
   group: image
   cancel-in-progress: false
 
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
 jobs:
+  # 发版前质量门禁：复用与 ci.yml 同一份检查（后端 + 前端），不过不许构建/推送镜像。
+  # 适配「直接提交 main、未开分支保护」——保证打 tag 时的代码一定经过校验。
+  verify:
+    uses: ./.github/workflows/quality.yml
+
   image:
     name: Build and push image
+    needs: verify # verify 全绿才构建/推送，否则整个发版中止
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -36,23 +42,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # 标签交给标准工具 metadata-action：
+      #   type=semver 从 vX.Y.Z 算出版本号 X.Y.Z；
+      #   flavor latest=auto 是内置的「预发布感知」——仅非预发布版本才追加 latest，
+      #   v1.2.3-rc.1 这类带 - 的预发布不会动 latest，无需自己写 enable 条件；
+      #   type=sha 仅在非 tag（如 workflow_dispatch 手动逃生口）时回退打 sha-<短SHA>。
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
-          # latest 仅「tag 触发且非预发布」才打：限定 refs/tags/ 防手动 workflow_dispatch
-          # 从分支误打 latest；名字不含 - 即非预发布（如 v1.2.3），带 - 视为预发布（如 v1.2.3-rc.1）
+          images: ${{ env.IMAGE }}
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-') }}
+            type=sha,enable=${{ github.ref_type != 'tag' }}
+          flavor: |
+            latest=auto
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

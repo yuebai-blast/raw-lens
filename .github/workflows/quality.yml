@@ -1,0 +1,91 @@
+name: Quality
+
+# 可复用的质量门禁：后端 + 前端检查。供 ci.yml（PR/push）与 image.yml（发版前）共同调用，
+# 保证「合并前校验」和「发版前校验」用同一份定义，永不漂移。
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  # 后端与前端拆成独立 job 并行跑：失败归因清晰，互不阻塞
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 工具链版本唯一来源是 mise.toml，避免和本地、go.mod 漂移
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v2
+
+      # 缓存 Go module 下载与编译产物，加快后续 CI
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: go-${{ runner.os }}-
+
+      - name: Check formatting
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "以下文件需要 gofmt:"
+            echo "$files"
+            exit 1
+          fi
+
+      # 本项目并发处理连接、共享同一个 store.Store，开 -race 检测数据竞争
+      - name: Run tests (race)
+        run: go test -race ./...
+
+      - name: Run vet
+        run: go vet ./...
+
+      # 验证可编译（web/dist/.keep 已提交，无需前端产物即可 embed）
+      - name: Build
+        run: go build ./...
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v2
+
+      # 缓存 pnpm store，加快依赖安装
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      # 前端依赖（node_modules）不在仓库里，必须在 build/test 之前安装
+      - name: Install frontend dependencies
+        run: pnpm -C frontend install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm -C frontend typecheck
+
+      - name: Lint
+        run: pnpm -C frontend lint
+
+      - name: Test
+        run: pnpm -C frontend test
+
+      - name: Build
+        run: pnpm -C frontend build
