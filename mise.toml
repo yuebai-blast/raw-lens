@@ -4,8 +4,6 @@
 go = "1.26.4"
 node = "20.18.1"
 pnpm = "9.15.9"
-# 发布工具：CI 的 release 与 release-check 都靠它，锁定版本保证可复现
-goreleaser = "2.16.0"
 
 [tasks.install]
 description = "安装全部依赖（Go 模块 + 前端 pnpm）"
@@ -23,22 +21,9 @@ run = "pnpm -C frontend dev"
 description = "构建前端并编译单二进制到 bin/rawlens"
 run = ["pnpm -C frontend build", "go build -o bin/rawlens ./cmd/rawlens"]
 
-[tasks.build-linux]
-description = "构建前端并交叉编译 linux/amd64 部署产物（CGO_ENABLED=0）"
-env = { GOOS = "linux", GOARCH = "amd64", CGO_ENABLED = "0" }
-run = ["pnpm -C frontend build", "go build -o bin/rawlens-linux-amd64 ./cmd/rawlens"]
-
 [tasks.test-web]
 description = "前端检查：typecheck + lint + vitest"
 run = ["pnpm -C frontend typecheck", "pnpm -C frontend lint", "pnpm -C frontend test"]
-
-[tasks.release-check]
-description = "校验 .goreleaser.yaml 配置（CI 会跑）"
-run = "goreleaser check"
-
-[tasks.release]
-description = "本地试跑发布快照，不推送（验证打包产物）"
-run = "goreleaser release --snapshot --clean"
 
 [tasks.image]
 description = "本地构建 Docker 镜像（单架构，验证 Dockerfile）"

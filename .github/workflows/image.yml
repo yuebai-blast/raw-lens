@@ -42,7 +42,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           # latest 仅「tag 触发且非预发布」才打：限定 refs/tags/ 防手动 workflow_dispatch
-          # 从分支误打 latest；名字不含 - 即非预发布（如 v1.2.3），与 goreleaser prerelease:auto 对齐
+          # 从分支误打 latest；名字不含 - 即非预发布（如 v1.2.3），带 - 视为预发布（如 v1.2.3-rc.1）
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

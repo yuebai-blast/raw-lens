@@ -77,25 +77,9 @@ curl -k https://localhost:8080/secure -d hi    # -k 跳过自签名校验
 
 `cert`/`key` 留空时自动生成一张内存自签名证书（含 `localhost` / `127.0.0.1`），仅供测试。客户端会报证书不可信，用 `curl -k` 或浏览器手动信任即可。
 
-## 部署到服务器
+## 部署
 
-先在本机构建，再上传：
-
-```bash
-mise run build              # 先构建前端（pnpm build），再编译 Go 二进制到 bin/rawlens
-mise run build-linux        # 或：交叉编译 linux/amd64 产物 bin/rawlens-linux-amd64
-scp bin/rawlens-linux-amd64 user@server:/usr/local/bin/rawlens
-cp config.example.yaml config.yaml                           # 首次：从模板复制再按需修改
-scp config.yaml user@server:/etc/rawlens/config.yaml
-ssh user@server 'rawlens -config /etc/rawlens/config.yaml'   # 或配 systemd
-```
-
-部署只需二进制 + 一个 yaml（前端已通过 `go:embed` 编进二进制，无需额外文件）。运行时会在启动目录生成 `rawlens.db`（SQLite 持久化文件），可通过 `store.path` 指定路径或设为 `":memory:"` 改为内存模式。
-防火墙放开 8080 给客户端；面板端口 9090 建议只在本机/内网访问（或用 SSH 隧道：`ssh -L 9090:localhost:9090 user@server`）。
-
-## Docker
-
-镜像发布在 GHCR：`ghcr.io/yuebai-blast/raw-lens`（推送 `vX.Y.Z` tag 时由 CI 构建 `linux/amd64,linux/arm64` 多架构镜像）。
+本项目**只支持 Docker 部署**。镜像发布在 GHCR：`ghcr.io/yuebai-blast/raw-lens`（推送 `vX.Y.Z` tag 时由 CI 构建 `linux/amd64,linux/arm64` 多架构镜像）。
 
 ```bash
 docker run --rm \
@@ -110,6 +94,7 @@ docker run --rm \
   -v "$(pwd)/config.yaml:/data/config.yaml:ro"
   ```
 - 镜像以非 root 用户（uid 65532）运行；数据目录 `/data` 已归该用户所有。
+- 抓包端口 8080 对外放开给客户端；面板端口 9090 建议只在本机/内网访问（如用 SSH 隧道 `ssh -L 9090:localhost:9090 user@server`，或只把 8080 映射到宿主公网）。
 - 本地构建验证：`mise run image`（构建单架构 `rawlens:local`）。
 
 > 首次发布后镜像在 GitHub Packages 默认 private，如需公开拉取，到仓库 Packages 设置里改为 public。
