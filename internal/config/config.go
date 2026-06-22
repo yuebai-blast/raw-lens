@@ -16,6 +16,9 @@ import (
 // DefaultPath 是不指定 -config 时查找的默认路径（相对当前工作目录）。
 const DefaultPath = "config.yaml"
 
+// DefaultDBPath 是 SQLITE 模式下的默认库文件路径（相对当前工作目录，落在专属 data 子目录）。
+const DefaultDBPath = "data/db/rawlens.db"
+
 type TLS struct {
 	Enabled bool   `yaml:"enabled"` // 开启后抓包端口走 TLS（抓 HTTPS 原始请求）
 	Cert    string `yaml:"cert"`    // 证书路径，留空则用内存自签名证书
@@ -31,23 +34,42 @@ type Dashboard struct {
 	Addr string `yaml:"addr"` // 前端面板监听地址
 }
 
+// Mode 是存储模式枚举：成员名与字符串取值均为 SCREAMING_SNAKE_CASE 且逐字一致。
+type Mode string
+
+const (
+	SQLITE Mode = "SQLITE" // 落盘到默认 SQLite 文件 rawlens.db
+	MEMORY Mode = "MEMORY" // 内存库，进程重启即清空
+)
+
 type Store struct {
-	Max  int    `yaml:"max"`  // 最多保留多少条请求（超出删最旧）
-	Path string `yaml:"path"` // SQLite 文件路径；":memory:" 为内存库（重启即清空）
+	Max  int  `yaml:"max"`  // 最多保留多少条请求（超出删最旧）
+	Mode Mode `yaml:"mode"` // 存储模式：SQLITE=落盘默认文件 data/db/rawlens.db；MEMORY=内存库（重启即清空）
+}
+
+// Log 控制日志文件输出。日志始终打到 stdout；File 非空时再额外写一份到该文件，
+// 用 lumberjack 按大小滚动（生成 rawlens.log + rawlens-时间戳.log 等备份）。
+type Log struct {
+	File       string `yaml:"file"`         // 日志文件路径；留空则只输出到 stdout，不落文件
+	MaxSizeMB  int    `yaml:"max_size_mb"`  // 单个文件多大（MB）就滚动
+	MaxBackups int    `yaml:"max_backups"`  // 最多保留多少个滚动备份
+	MaxAgeDays int    `yaml:"max_age_days"` // 备份最多保留多少天
 }
 
 type Config struct {
 	Capture   Capture   `yaml:"capture"`
 	Dashboard Dashboard `yaml:"dashboard"`
 	Store     Store     `yaml:"store"`
+	Log       Log       `yaml:"log"`
 }
 
 // Default 返回内置默认配置。
 func Default() *Config {
 	return &Config{
-		Capture:   Capture{Addr: ":8080"},
-		Dashboard: Dashboard{Addr: ":9090"},
-		Store:     Store{Max: 500, Path: "rawlens.db"},
+		Capture:   Capture{Addr: ":9100"},
+		Dashboard: Dashboard{Addr: ":9101"},
+		Store:     Store{Max: 500, Mode: SQLITE},
+		Log:       Log{File: "data/logs/rawlens.log", MaxSizeMB: 10, MaxBackups: 5, MaxAgeDays: 14},
 	}
 }
 
@@ -68,8 +90,25 @@ func Load(path string) (*Config, bool, error) {
 	if cfg.Store.Max <= 0 {
 		cfg.Store.Max = 500
 	}
-	if cfg.Store.Path == "" {
-		cfg.Store.Path = "rawlens.db"
+	switch cfg.Store.Mode {
+	case "":
+		cfg.Store.Mode = SQLITE
+	case SQLITE, MEMORY:
+		// 合法取值
+	default:
+		return nil, false, fmt.Errorf("store.mode 取值非法 %q（仅支持 SQLITE / MEMORY）", cfg.Store.Mode)
+	}
+	// 日志落文件时（File 非空）滚动参数兜底，避免 0 值导致异常滚动行为。
+	if cfg.Log.File != "" {
+		if cfg.Log.MaxSizeMB <= 0 {
+			cfg.Log.MaxSizeMB = 10
+		}
+		if cfg.Log.MaxBackups <= 0 {
+			cfg.Log.MaxBackups = 5
+		}
+		if cfg.Log.MaxAgeDays <= 0 {
+			cfg.Log.MaxAgeDays = 14
+		}
 	}
 	return cfg, true, nil
 }

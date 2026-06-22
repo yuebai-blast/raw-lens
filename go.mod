@@ -3,6 +3,7 @@ module github.com/yuebai-blast/raw-lens
 go 1.26
 
 require (
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.52.0
 )

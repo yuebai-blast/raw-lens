@@ -14,7 +14,7 @@ description = "本地运行后端（提供 /api 与面板，读 ./config.yaml）
 run = "go run ./cmd/rawlens"
 
 [tasks.webui]
-description = "本地运行前端 Vite dev server（HMR，proxy /api 到 :9090）"
+description = "本地运行前端 Vite dev server（HMR，proxy /api 到 :9101）"
 run = "pnpm -C frontend dev"
 
 [tasks.build]

@@ -4,7 +4,7 @@
 
 capture:
   # 裸 TCP 抓包监听地址 —— 对外暴露这个端口，客户端把请求发到这里
-  addr: ":8080"
+  addr: ":9100"
   tls:
     enabled: false   # 开启后抓包端口走 TLS，可抓 HTTPS 的原始请求
     cert: ""         # 证书文件路径；留空则用内存自签名证书（客户端需 curl -k）
@@ -12,8 +12,15 @@ capture:
 
 dashboard:
   # 前端面板监听地址 —— 浏览器开这个看抓到的请求，建议只在内网/本机访问
-  addr: ":9090"
+  addr: ":9101"
 
 store:
-  max: 500            # 最多保留多少条请求（超出删最旧）
-  path: "rawlens.db"  # SQLite 文件路径，相对启动目录；填 ":memory:" 则重启即清空
+  max: 500       # 最多保留多少条请求（超出删最旧）
+  mode: SQLITE   # 存储模式：SQLITE=落盘到默认文件 data/db/rawlens.db；MEMORY=内存库（重启即清空）
+
+log:
+  # 日志始终输出到 stdout；下面 file 非空时再额外写一份到该文件（lumberjack 按大小滚动）
+  file: "data/logs/rawlens.log"   # 留空 "" 则只输出到 stdout、不落文件
+  max_size_mb: 10                 # 单个文件超过多少 MB 就滚动
+  max_backups: 5                  # 最多保留多少个滚动备份
+  max_age_days: 14                # 备份最多保留多少天

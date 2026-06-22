@@ -10,8 +10,8 @@ raw-lens 是一个**保真**的 HTTP 请求观察工具：直接监听裸 TCP/TL
 
 ```bash
 mise run install       # 安装全部依赖（go mod download + pnpm install）
-mise run api           # 本地启动后端（= go run ./cmd/rawlens，监听 :8080/:9090）
-mise run webui         # 本地启动 Vite 开发服务器（HMR，/api 代理到 :9090）
+mise run api           # 本地启动后端（= go run ./cmd/rawlens，监听 :9100/:9101）
+mise run webui         # 本地启动 Vite 开发服务器（HMR，/api 代理到 :9101）
 mise run build         # 前端 pnpm build 后构建本机二进制到 bin/rawlens
 mise run test-web      # 前端质量检查（typecheck + lint + vitest）
 mise run image         # 本地构建 Docker 镜像 rawlens:local（单架构，验证 Dockerfile）
@@ -21,13 +21,13 @@ go vet ./...           # CI 会跑
 gofmt -l .             # CI 用它判定格式，有输出即失败
 ```
 
-本地开发双进程流程：先 `mise run api` 启动后端，再 `mise run webui` 启动 Vite（`http://localhost:5173`），Vite 会把 `/api/*` 代理到后端 `:9090`，前端改动 HMR 即时生效，无需重启后端。
+本地开发双进程流程：先 `mise run api` 启动后端，再 `mise run webui` 启动 Vite（`http://localhost:5173`），Vite 会把 `/api/*` 代理到后端 `:9101`，前端改动 HMR 即时生效，无需重启后端。
 
 提交前确保 `gofmt -l .` 无输出、`go vet ./...` 和 `go test ./...` 通过——CI（`.github/workflows/ci.yml`）拆成并行的 `backend`、`frontend`、`image-build` 三个 job：`backend` 跑 gofmt + `go test -race ./...`（本项目并发处理连接、共享 store，开竞态检测）+ `go vet` + `go build`；`frontend` 跑 typecheck/lint/test + `pnpm build`；`image-build` 在 PR 阶段 `docker build` 只构建不推送，提前暴露 Dockerfile 损坏。
 
 ## 架构要点
 
-**双端口、单进程**（`cmd/rawlens/main.go`）：抓包端口（默认 `:8080`，对外暴露）和面板端口（默认 `:9090`，仅内网/本机）分开，避免打开面板页面本身的请求污染抓包列表。两个 server 共享同一个 `store.Store`。
+**双端口、单进程**（`cmd/rawlens/main.go`）：抓包端口（默认 `:9100`，对外暴露）和面板端口（默认 `:9101`，仅内网/本机）分开，避免打开面板页面本身的请求污染抓包列表。两个 server 共享同一个 `store.Store`。
 
 依赖方向：`capture → store`、`dashboard → store + web`、`main → config + 三者`。
 
@@ -38,7 +38,9 @@ gofmt -l .             # CI 用它判定格式，有输出即失败
 - `parseCaptured` 解析出结构化字段时**保留原始顺序和大小写**，header 值只去掉冒号后惯例的一个前导空格。
 - 改动这里时务必保持「字节保真」这个不变量，不要顺手做任何规范化。
 
-`store.CapturedRequest` 同时保存 `Raw`（全量原始字节）和解析后的结构化字段（`Headers [][2]string` 保序）。`Store` 以 SQLite 持久化（驱动 `modernc.org/sqlite`，纯 Go、保 `CGO_ENABLED=0`），默认落盘到 `rawlens.db`，按条数保留最近 `max` 条（超出删最旧）；`store.path` 配 `":memory:"` 可恢复进程重启即清空的行为。
+`store.CapturedRequest` 同时保存 `Raw`（全量原始字节）和解析后的结构化字段（`Headers [][2]string` 保序）。`Store` 以 SQLite 持久化（驱动 `modernc.org/sqlite`，纯 Go、保 `CGO_ENABLED=0`），默认落盘到 `data/db/rawlens.db`（`store.New` 会 `MkdirAll` 父目录），按条数保留最近 `max` 条（超出删最旧）；`store.mode` 配 `MEMORY` 可恢复进程重启即清空的行为（底层 store 仍以 `:memory:` 路径实现，`config` 层把 `SQLITE`/`MEMORY` 模式映射成路径，SQLITE 走 `config.DefaultDBPath`）。
+
+**日志**（`cmd/rawlens/main.go`）：始终用标准库 `log` 打到 stdout；`config` 的 `log.file` 非空时，再用 `lumberjack` 把日志按大小滚动写一份到该文件，`log.SetOutput(io.MultiWriter(os.Stderr, lj))` 做双写。默认 `data/logs/rawlens.log`、保留 14 天。db 与日志都落 `data/` 子目录，dev（cwd=仓库根）与容器（`WORKDIR=/app`）布局一致，`data/` 已在 `.gitignore`。
 
 **TLS 抓包**（`internal/capture/tls.go`）：`tls.NewListener` 包一层后，握手由 raw-lens 终结，从 `tls.Conn` 读到的是**解密后的明文字节**，所以下游解析逻辑完全复用，无需区分 HTTP/HTTPS。`cert`/`key` 留空时生成内存自签名证书。
 
@@ -46,7 +48,7 @@ gofmt -l .             # CI 用它判定格式，有输出即失败
 
 **前端架构**（`frontend/` → `web/dist/`）：前端是 Vue 3 + TypeScript + Vite + Pinia + Vue Router 项目，源码在 `frontend/src/`（App.vue、router、stores/captures.ts、components/、views/、utils/、types/、styles/global.css）。`pnpm build`（即 `mise run build` 的前半段）将产物输出到 `web/dist/`，再由 `web/embed.go` 的 `//go:embed all:dist` 编进 Go 二进制；`web/dist/.keep` 已提交，保证不构建前端时 `go build/test/vet ./...` 也能通过。`dashboard.go` 提供 JSON API（`GET /api/requests`、`GET /api/requests/{id}`、`POST /api/clear`）+ SPA fallback（非 API、非静态文件路径一律返回 index.html，使 `/r/:id` 刷新可用）；`Raw`/`Body` 经 base64 传给前端，前端提供 RAW/HEADERS/BODY/HEX 四视图。改前端后需重新 `mise run build` 才能更新内嵌产物；日常开发用双进程流程（见"常用命令"）。
 
-**发布与镜像**：本项目**只发布 Docker 镜像**这一种交付物（不出独立二进制、无 goreleaser）。`image.yml` 由 `v*.*.*` tag 触发，用 buildx 构建**单架构**（runner 本机 amd64）镜像推到 `ghcr.io/yuebai-blast/raw-lens`（登录用内置 `GITHUB_TOKEN`）；镜像标签不走 `metadata-action`，由一段 shell 从 tag 剥出版本号 `X.Y.Z`，`latest` 仅「tag 触发且非预发布（版本号不含 `-`）」才追加。保留 buildx 是为了 `type=gha` 层缓存（非为多架构）。镜像由仓库根 `Dockerfile` 两阶段构建，**工具链版本只认根 `mise.toml`，不在 Dockerfile 里重复钉**（见全局规范 `monorepo-docker-build.md`）：构建阶段用干净的 `debian:12-slim` 底座，按官方写法 `curl https://mise.run | sh` 装进 mise，再 `mise install go node pnpm` 照 `mise.toml` 装工具链，依次跑 `pnpm build` 出前端、`CGO_ENABLED=0` 纯 Go 编译把 `web/dist` embed 进单二进制（embed 机制同上）→ 运行阶段 `distroless/static` 非 root（uid 65532）只带二进制，`WORKDIR /data`、`rawlens.db` 落该目录。**禁止**改回 `node:`/`golang:` 这类带运行时的基础镜像（会把版本钉死、绕过 `mise.toml` 单一来源）；Dockerfile 里唯一允许钉死的版本是 mise 自身的 `MISE_VERSION`（自举工具无法由 mise 管），升级 mise 时同步它。改 Dockerfile 后 `mise run image` 本地验证；PR 阶段 `ci.yml` 的 `image-build` job 会兜底。本项目**不做服务器自动部署**。
+**发布与镜像**：本项目**只发布 Docker 镜像**这一种交付物（不出独立二进制、无 goreleaser）。`image.yml` 由 `v*.*.*` tag 触发，用 buildx 构建**单架构**（runner 本机 amd64）镜像推到 `ghcr.io/yuebai-blast/raw-lens`（登录用内置 `GITHUB_TOKEN`）；镜像标签不走 `metadata-action`，由一段 shell 从 tag 剥出版本号 `X.Y.Z`，`latest` 仅「tag 触发且非预发布（版本号不含 `-`）」才追加。保留 buildx 是为了 `type=gha` 层缓存（非为多架构）。镜像由仓库根 `Dockerfile` 两阶段构建，**工具链版本只认根 `mise.toml`，不在 Dockerfile 里重复钉**（见全局规范 `monorepo-docker-build.md`）：构建阶段用干净的 `debian:13-slim` 底座，按官方写法 `curl https://mise.run | sh` 装进 mise，再 `mise install go node pnpm` 照 `mise.toml` 装工具链，依次跑 `pnpm build` 出前端、`CGO_ENABLED=0` 纯 Go 编译把 `web/dist` embed 进单二进制（embed 机制同上）→ 运行阶段也用 `debian:13-slim`（普通底座、**默认 root**），只 `COPY` 二进制，`WORKDIR /app`。选 root 镜像是刻意的：以 root 跑能直接写 bind 挂载进来的宿主目录，部署时无需 chown、compose 也无需 `user:`（代价是安全性下降、宿主 `./data` 下文件归 root，本项目按"够用优先"取舍）。db 落 `/app/data/db`、日志落 `/app/data/logs`，部署时把宿主 `./config.yaml`、`./data` 分别挂到 `/app/config.yaml`、`/app/data`。**禁止**改回 `node:`/`golang:` 这类带运行时的基础镜像（会把版本钉死、绕过 `mise.toml` 单一来源）；Dockerfile 里唯一允许钉死的版本是 mise 自身的 `MISE_VERSION`（自举工具无法由 mise 管），升级 mise 时同步它。改 Dockerfile 后 `mise run image` 本地验证；PR 阶段 `ci.yml` 的 `image-build` job 会兜底。本项目**不做服务器自动部署**。
 
 ## 配置
 

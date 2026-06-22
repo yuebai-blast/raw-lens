@@ -9,10 +9,8 @@ docs/superpowers/
 # 实际运行时配置（从 config.example.yaml 复制而来），各环境自有、不入库
 config.yaml
 
-# SQLite 抓包数据库（运行时生成，不入库）
-*.db
-*.db-wal
-*.db-shm
+# 运行时数据目录（SQLite 库 + 日志文件），dev 与容器都落在 data/，不入库
+/data/
 
 # 前端构建产物（由 mise run build 生成），仅保留占位文件
 web/dist/*

@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -68,7 +70,15 @@ func New(opts Options) (*Store, error) {
 	}
 	path := opts.Path
 	if path == "" {
-		path = "rawlens.db"
+		path = "data/db/rawlens.db"
+	}
+	// 文件库需先确保父目录存在，否则 SQLite 打不开（:memory: 不涉及目录）。
+	if path != ":memory:" {
+		if dir := filepath.Dir(path); dir != "" && dir != "." {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return nil, err
+			}
+		}
 	}
 	db, err := sql.Open("sqlite", dsnFor(path))
 	if err != nil {

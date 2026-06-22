@@ -2,7 +2,7 @@
 
 # ---- 构建阶段：干净 slim 底座 + curl 装 mise，工具链版本全由根 mise.toml 决定 ----
 # 不用 node:/golang: 这类带运行时的基础镜像（会把版本钉死在 Dockerfile，绕过 mise.toml 单一来源）
-FROM debian:12-slim AS build
+FROM debian:13-slim AS build
 
 # mise 自身版本在此钉死——自举工具无法由 mise.toml 管，这是 Dockerfile 里唯一允许的版本钉死
 ENV MISE_VERSION=v2026.6.0
@@ -29,19 +29,18 @@ RUN go mod download
 # 3) 拷源码：先前端 build 出 web/dist，再 CGO_ENABLED=0 纯 Go 编译把它 embed 进单二进制
 COPY . .
 RUN pnpm -C frontend build \
- && mkdir -p /data \
  && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/rawlens ./cmd/rawlens
 
-# ---- 运行阶段：distroless 非 root，只带二进制，构建期的 mise/工具链都不进最终镜像 ----
-FROM gcr.io/distroless/static-debian12:nonroot
+# ---- 运行阶段：普通 debian-slim 底座（默认 root），只带二进制 ----
+# 用普通镜像而非 distroless 非 root：以 root 跑，直接可写 bind 挂载进来的目录，
+# 部署时无需 chown 宿主目录、也无需在 compose 里指定 user。构建期的 mise/工具链不进这一层。
+FROM debian:13-slim AS runtime
 COPY --from=build /out/rawlens /usr/local/bin/rawlens
-# /data 归非 root 用户所有，rawlens.db 才可写
-COPY --from=build --chown=65532:65532 /data /data
-WORKDIR /data
-USER 65532:65532
+# WORKDIR=/app：默认读 /app/config.yaml，db 落 /app/data/db、日志落 /app/data/logs
+# （部署时把宿主 ./config.yaml、./data 分别挂到 /app/config.yaml、/app/data）。
+WORKDIR /app
 # EXPOSE 仅为元数据/文档，不发布也不绑定端口；这里标的是内置默认端口
-# （capture :8080 / dashboard :9090）。实际监听端口由 config.yaml 决定，
+# （capture :9100 / dashboard :9101）。实际监听端口由 config.yaml 决定，
 # 改了配置请以配置为准，并自行用 docker run -p 映射对应端口。
-EXPOSE 8080 9090
-# 默认无 config.yaml → 内置默认值；自定义配置挂到 /data/config.yaml 即被读取
+EXPOSE 9100 9101
 ENTRYPOINT ["/usr/local/bin/rawlens"]

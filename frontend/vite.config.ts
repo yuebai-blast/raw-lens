@@ -17,7 +17,7 @@ function keepDistPlaceholder(): Plugin {
   }
 }
 
-// 面板后端默认监听 9090，dev 时把 /api 代理过去，前端享受 Vite HMR。
+// 面板后端默认监听 9101，dev 时把 /api 代理过去，前端享受 Vite HMR。
 export default defineConfig({
   plugins: [vue(), keepDistPlaceholder()],
   resolve: {
@@ -25,7 +25,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': { target: 'http://localhost:9090', changeOrigin: true },
+      '/api': { target: 'http://localhost:9101', changeOrigin: true },
     },
   },
   build: {

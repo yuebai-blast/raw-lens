@@ -52,7 +52,7 @@ mise run test-web
 mise run image      # 本地构建镜像，验证 Dockerfile
 ```
 
-如果本次发布包含前端面板改动，手动启动并验证面板（`mise run api` + `mise run webui`，面板地址 `http://localhost:5173` 开发态、生产态在 `:9090`）。
+如果本次发布包含前端面板改动，手动启动并验证面板（`mise run api` + `mise run webui`，面板地址 `http://localhost:5173` 开发态、生产态在 `:9101`）。
 
 ### 3. 创建并推送 tag
 
@@ -74,7 +74,7 @@ git push origin v0.3.0
 - 在仓库 Packages 页面确认新镜像 tag 已出现。
 - 拉取镜像并启动一次，确认可正常运行：
   ```bash
-  docker run --rm -p 8080:8080 -p 9090:9090 ghcr.io/yuebai-blast/raw-lens:v0.3.0
+  docker run --rm -p 9100:9100 -p 9101:9101 ghcr.io/yuebai-blast/raw-lens:v0.3.0
   ```
 - 首次发布后镜像在 GitHub Packages 默认 private，如需公开拉取，到仓库 Packages 设置里改为 public。
 

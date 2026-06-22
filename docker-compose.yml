@@ -1,0 +1,43 @@
+# raw-lens 默认 docker-compose
+#
+# 把本文件放在一个专属目录（如 /xx/xx/rawlens）下，配置和数据都落在同目录，便于备份/迁移：
+#
+#   /xx/xx/rawlens/
+#   ├── docker-compose.yml
+#   ├── config.yaml        # 你的配置（从 config.example.yaml 复制改来）
+#   └── data/              # 容器写的数据目录
+#       ├── db/            # SQLite 库 rawlens.db 落这里
+#       └── logs/          # 日志文件落这里（rawlens.log + 滚动备份）
+#
+# 首次启动（在本文件所在目录执行）：
+#   cp config.example.yaml config.yaml   # 准备配置
+#   mkdir -p data                        # 建数据目录（db/ logs/ 子目录由程序自动创建）
+#   docker compose up -d
+#
+# 镜像以 root 运行，能直接写 bind 挂载的 ./data，无需 chown、无需指定 user。
+# 注意：因此 ./data 下生成的文件在宿主上归 root，删除/编辑它们可能需要 sudo。
+#
+# 启动后：客户端把请求发到 9100；浏览器开 http://127.0.0.1:9101 看面板。
+# 改了 config.yaml 里的端口，记得同步下面的 ports 映射。
+
+services:
+  rawlens:
+    image: ghcr.io/yuebai-blast/raw-lens:latest
+    container_name: rawlens
+    restart: unless-stopped
+    ports:
+      # 抓包端口：对外暴露，客户端把请求打到这里
+      - "9100:9100"
+      # 面板端口：仅绑定本机回环，避免面板对公网开放（建议只在内网/本机访问）
+      - "127.0.0.1:9101:9101"
+    volumes:
+      # 配置文件：宿主 ./config.yaml 只读挂到容器 WORKDIR 下的 /app/config.yaml（默认读取位置）
+      - ./config.yaml:/app/config.yaml:ro
+      # 数据目录：宿主 ./data 挂到 /app/data，db 与日志都落这里，与 compose 同目录便于备份
+      - ./data:/app/data
+    # 限制 Docker 自身抓取的 stdout 日志大小，避免写满磁盘（文件日志另由程序按 lumberjack 滚动）
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

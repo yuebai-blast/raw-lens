@@ -3,12 +3,15 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"io"
 	"log"
+	"os"
 
 	"github.com/yuebai-blast/raw-lens/internal/capture"
 	"github.com/yuebai-blast/raw-lens/internal/config"
 	"github.com/yuebai-blast/raw-lens/internal/dashboard"
 	"github.com/yuebai-blast/raw-lens/internal/store"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func main() {
@@ -19,21 +22,42 @@ func main() {
 	if err != nil {
 		log.Fatalf("配置: %v", err)
 	}
+	// 日志：始终打 stdout；配了 log.file 就再 tee 一份到文件（lumberjack 按大小滚动）。
+	if cfg.Log.File != "" {
+		lj := &lumberjack.Logger{
+			Filename:   cfg.Log.File,
+			MaxSize:    cfg.Log.MaxSizeMB,
+			MaxBackups: cfg.Log.MaxBackups,
+			MaxAge:     cfg.Log.MaxAgeDays,
+			Compress:   true,
+		}
+		defer lj.Close()
+		log.SetOutput(io.MultiWriter(os.Stderr, lj))
+	}
 	if loaded {
 		log.Printf("已加载配置文件 %s", *configPath)
 	} else {
 		log.Printf("未找到 %s，使用内置默认值", *configPath)
 	}
+	if cfg.Log.File != "" {
+		log.Printf("日志：同时输出到 stdout 与 %s（按大小滚动，最多 %d 份 / %d 天）",
+			cfg.Log.File, cfg.Log.MaxBackups, cfg.Log.MaxAgeDays)
+	}
 
-	st, err := store.New(store.Options{Path: cfg.Store.Path, Max: cfg.Store.Max})
+	// 存储模式映射到底层 store 的路径：MEMORY 用 ":memory:"，SQLITE 走默认文件 data/db/rawlens.db。
+	storePath := config.DefaultDBPath
+	if cfg.Store.Mode == config.MEMORY {
+		storePath = ":memory:"
+	}
+	st, err := store.New(store.Options{Path: storePath, Max: cfg.Store.Max})
 	if err != nil {
 		log.Fatalf("存储: %v", err)
 	}
 	defer st.Close()
-	if cfg.Store.Path == ":memory:" {
+	if cfg.Store.Mode == config.MEMORY {
 		log.Printf("存储：内存模式（进程重启即清空）")
 	} else {
-		log.Printf("存储：SQLite 文件 %s（最多保留 %d 条）", cfg.Store.Path, cfg.Store.Max)
+		log.Printf("存储：SQLite 文件 %s（最多保留 %d 条）", storePath, cfg.Store.Max)
 	}
 
 	var tlsConf *tls.Config
