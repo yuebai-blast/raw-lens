@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160" width="520" height="160" role="img" aria-label="raw·lens — wire-level http inspector">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="0%" r="120%">
+      <stop offset="0%" stop-color="#0d1513"/>
+      <stop offset="60%" stop-color="#070a09"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- 炭黑机身 -->
+  <rect width="520" height="160" rx="14" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="519" height="159" rx="13.5" fill="none" stroke="#1c2723"/>
+  <!-- CRT 扫描线底纹 -->
+  <g opacity="0.05">
+    <line x1="0" y1="40" x2="520" y2="40" stroke="#cfe3da"/>
+    <line x1="0" y1="80" x2="520" y2="80" stroke="#cfe3da"/>
+    <line x1="0" y1="120" x2="520" y2="120" stroke="#cfe3da"/>
+  </g>
+
+  <!-- 光圈标记（六边形 aperture），居左 -->
+  <g transform="translate(40,40) scale(1.25)" filter="url(#glow)">
+    <g fill="none" stroke="#34e0a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="32" cy="32" r="22" stroke-opacity="0.45"/>
+      <polygon points="32,22 23.34,27 23.34,37 32,42 40.66,37 40.66,27"/>
+      <line x1="32" y1="22" x2="15.55" y2="22.5"/>
+      <line x1="23.34" y1="27" x2="15.55" y2="41.5"/>
+      <line x1="23.34" y1="37" x2="32" y2="51"/>
+      <line x1="32" y1="42" x2="48.45" y2="41.5"/>
+      <line x1="40.66" y1="37" x2="48.45" y2="22.5"/>
+      <line x1="40.66" y1="27" x2="32" y2="13"/>
+    </g>
+    <circle cx="32" cy="32" r="2.4" fill="#34e0a1"/>
+  </g>
+
+  <!-- 字标 + 标语 -->
+  <g font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <text x="160" y="74" font-size="44" font-weight="500" letter-spacing="1" fill="#cfe3da">raw<tspan fill="#34e0a1">·</tspan>lens</text>
+    <text x="162" y="100" font-size="13" letter-spacing="4" fill="#4d615a">WIRE-LEVEL HTTP INSPECTOR</text>
+    <!-- 保真灵魂：原样保留的 CRLF 字节 -->
+    <text x="162" y="126" font-size="13" letter-spacing="1" fill="#88a096">the bytes, as sent <tspan fill="#a394f2" letter-spacing="2">0D 0A</tspan></text>
+  </g>
+</svg>

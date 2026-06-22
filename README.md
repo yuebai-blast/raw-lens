@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/brand/raw-lens-lockup.svg" alt="raw·lens — wire-level http inspector" width="520">
+</p>
+
 # raw-lens
 
 抓 HTTP 请求的**原始字节**——header 的顺序、大小写、重复项，以及 body，全部保真展示。

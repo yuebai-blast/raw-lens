@@ -6,10 +6,69 @@ const store = useCaptureStore()
 <template>
   <header class="masthead">
     <div class="brand">
-      <span
+      <svg
         class="brand-mark"
+        viewBox="0 0 64 64"
         aria-hidden="true"
-      />
+      >
+        <g
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle
+            cx="32"
+            cy="32"
+            r="22"
+            stroke-opacity="0.45"
+          />
+          <polygon points="32,22 23.34,27 23.34,37 32,42 40.66,37 40.66,27" />
+          <line
+            x1="32"
+            y1="22"
+            x2="15.55"
+            y2="22.5"
+          />
+          <line
+            x1="23.34"
+            y1="27"
+            x2="15.55"
+            y2="41.5"
+          />
+          <line
+            x1="23.34"
+            y1="37"
+            x2="32"
+            y2="51"
+          />
+          <line
+            x1="32"
+            y1="42"
+            x2="48.45"
+            y2="41.5"
+          />
+          <line
+            x1="40.66"
+            y1="37"
+            x2="48.45"
+            y2="22.5"
+          />
+          <line
+            x1="40.66"
+            y1="27"
+            x2="32"
+            y2="13"
+          />
+        </g>
+        <circle
+          cx="32"
+          cy="32"
+          r="2.4"
+          fill="currentColor"
+        />
+      </svg>
       <div class="brand-text">
         <h1>raw<span class="sep">·</span>lens</h1>
         <p>WIRE-LEVEL HTTP INSPECTOR</p>
@@ -54,13 +113,10 @@ const store = useCaptureStore()
 
 .brand { display: flex; align-items: center; gap: 14px; }
 .brand-mark {
-  width: 30px; height: 30px; flex: none; border-radius: 4px;
-  background:
-    radial-gradient(circle at 50% 50%, var(--phosphor) 0 3px, transparent 4px),
-    conic-gradient(from 0deg, transparent 0 80%, var(--phosphor-soft) 100%);
-  border: 1px solid #23332e;
-  box-shadow: 0 0 12px #34e0a155, inset 0 0 8px #000;
-  animation: spin 8s linear infinite;
+  width: 32px; height: 32px; flex: none;
+  color: var(--phosphor);
+  filter: drop-shadow(0 0 6px #34e0a155);
+  animation: spin 24s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
