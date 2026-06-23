@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import type { Summary, Detail } from '@/types/api'
+import router from '@/router'
+import { useAuthStore } from '@/stores/auth'
 
 const POLL_INTERVAL = 1500
 
@@ -30,6 +32,13 @@ export const useCaptureStore = defineStore('captures', {
       let items: Summary[]
       try {
         const res = await fetch('/api/requests')
+        if (res.status === 401) {
+          // 会话过期/被登出：停轮询、标记未登录并回登录页
+          this.stopPolling()
+          useAuthStore().authenticated = false
+          void router.push({ name: 'login' })
+          return
+        }
         if (!res.ok) throw new Error(String(res.status))
         items = (await res.json()) as Summary[]
         this.status = 'CAPTURING'
