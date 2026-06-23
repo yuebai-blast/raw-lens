@@ -77,6 +77,47 @@ export const useCaptureStore = defineStore('captures', {
         this.current = null
       }
     },
+    // setName 给某条记录设置备注名，成功后同步更新本地 list 与 current。
+    async setName(id: number, name: string) {
+      try {
+        const res = await fetch('/api/requests/' + id, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        })
+        if (res.status === 401) {
+          this.handleUnauthorized()
+          return
+        }
+        if (!res.ok) return
+      } catch {
+        return
+      }
+      const item = this.list.find((i) => i.id === id)
+      if (item) item.name = name
+      if (this.current && this.current.id === id) this.current.name = name
+    },
+    // remove 删除某条记录，成功后从 list 移除；若删的是当前项则清空详情并回到列表。
+    async remove(id: number) {
+      try {
+        const res = await fetch('/api/requests/' + id, { method: 'DELETE' })
+        if (res.status === 401) {
+          this.handleUnauthorized()
+          return
+        }
+        if (!res.ok) return
+      } catch {
+        return
+      }
+      this.list = this.list.filter((i) => i.id !== id)
+      this.knownIds.delete(id)
+      this.newIds.delete(id)
+      if (this.activeId === id) {
+        this.current = null
+        this.activeId = null
+        void router.push({ name: 'home' })
+      }
+    },
     async clear() {
       await fetch('/api/clear', { method: 'POST' })
       this.list = []

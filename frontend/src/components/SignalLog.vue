@@ -10,6 +10,11 @@ const router = useRouter()
 function select(id: number) {
   void router.push({ name: 'detail', params: { id: String(id) } })
 }
+
+// 删除前二次确认，避免误删；确认后调用 store.remove。
+function remove(id: number) {
+  if (window.confirm(`确认删除记录 #${id}？`)) void store.remove(id)
+}
 </script>
 
 <template>
@@ -28,6 +33,7 @@ function select(id: number) {
         :active="it.id === store.activeId"
         :is-new="store.newIds.has(it.id)"
         @select="select"
+        @delete="remove"
       />
     </div>
   </aside>

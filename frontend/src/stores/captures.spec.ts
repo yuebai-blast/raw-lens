@@ -15,7 +15,7 @@ function mockFetchOnce(json: unknown, ok = true, status?: number) {
 }
 
 const sample: Summary[] = [
-  { id: 1, time: '2026-06-19T00:00:00Z', remoteAddr: '1.2.3.4:5', tls: false, method: 'GET', target: '/a', proto: 'HTTP/1.1', headerCount: 2, bodySize: 0, rawSize: 30 },
+  { id: 1, time: '2026-06-19T00:00:00Z', remoteAddr: '1.2.3.4:5', tls: false, method: 'GET', target: '/a', proto: 'HTTP/1.1', name: '', headerCount: 2, bodySize: 0, rawSize: 30 },
 ]
 
 describe('useCaptureStore', () => {
@@ -82,6 +82,33 @@ describe('useCaptureStore', () => {
     auth.authenticated = true
     await s.refresh()
     expect(auth.authenticated).toBe(false)
+  })
+
+  it('setName 成功后更新 list 中该项的 name', async () => {
+    const s = useCaptureStore()
+    vi.stubGlobal('fetch', mockFetchOnce(sample))
+    await s.refresh()
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => null })
+    vi.stubGlobal('fetch', fetchMock)
+    await s.setName(1, '登录接口')
+    expect(fetchMock).toHaveBeenCalledWith('/api/requests/1', expect.objectContaining({ method: 'PATCH' }))
+    expect(s.list[0].name).toBe('登录接口')
+  })
+
+  it('remove 成功后从 list 移除该项；删的是当前项时清空 current', async () => {
+    const s = useCaptureStore()
+    const grown: Summary[] = [{ ...sample[0], id: 2 }, ...sample]
+    vi.stubGlobal('fetch', mockFetchOnce(grown))
+    await s.refresh()
+    s.activeId = 1
+    s.current = { ...sample[0], requestLine: '', headers: [], rawBase64: '', bodyBase64: '' }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => null })
+    vi.stubGlobal('fetch', fetchMock)
+    await s.remove(1)
+    expect(fetchMock).toHaveBeenCalledWith('/api/requests/1', expect.objectContaining({ method: 'DELETE' }))
+    expect(s.list.map((i) => i.id)).toEqual([2])
+    expect(s.current).toBeNull()
+    expect(s.activeId).toBeNull()
   })
 
   it('clear 后 list 与 current 清空', async () => {

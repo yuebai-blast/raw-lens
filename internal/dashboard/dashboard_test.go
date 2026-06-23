@@ -1,13 +1,29 @@
 package dashboard
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/yuebai-blast/raw-lens/internal/config"
 	"github.com/yuebai-blast/raw-lens/internal/store"
 )
+
+func seedReq(st *store.Store) int64 {
+	return st.Add(&store.CapturedRequest{
+		Time:        time.Now(),
+		RemoteAddr:  "127.0.0.1:1",
+		RequestLine: "GET / HTTP/1.1",
+		Method:      "GET",
+		Target:      "/",
+		Proto:       "HTTP/1.1",
+		Raw:         []byte("GET / HTTP/1.1\r\n\r\n"),
+	})
+}
 
 func newTestStore(t *testing.T) *store.Store {
 	t.Helper()
@@ -61,4 +77,89 @@ func TestAPIRequestsStillJSON(t *testing.T) {
 	if ct := rec.Header().Get("Content-Type"); ct != "application/json; charset=utf-8" {
 		t.Fatalf("Content-Type 期望 JSON，得到 %q", ct)
 	}
+}
+
+// PATCH /api/requests/{id} 设置名称：204，且后续 GET 详情/列表能读回。
+func TestPatchSetsName(t *testing.T) {
+	st := newTestStore(t)
+	h := newHandler(st, config.Auth{})
+	id := seedReq(st)
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/requests/"+itoa(id), strings.NewReader(`{"name":"  登录接口  "}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("PATCH 期望 204，得到 %d", rec.Code)
+	}
+
+	// 详情应带回去掉首尾空格的名称
+	detail := getJSON(t, h, "/api/requests/"+itoa(id))
+	if detail["name"] != "登录接口" {
+		t.Errorf("详情 name 期望 \"登录接口\"，得到 %v", detail["name"])
+	}
+	// 列表也应带回名称
+	list := getJSONArray(t, h, "/api/requests")
+	if len(list) != 1 || list[0]["name"] != "登录接口" {
+		t.Errorf("列表应带回名称，得到 %v", list)
+	}
+}
+
+// PATCH 非法 id 返回 400。
+func TestPatchBadID(t *testing.T) {
+	h := newHandler(newTestStore(t), config.Auth{})
+	req := httptest.NewRequest(http.MethodPatch, "/api/requests/abc", strings.NewReader(`{"name":"x"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("非法 id 期望 400，得到 %d", rec.Code)
+	}
+}
+
+// DELETE /api/requests/{id} 删除单条：204，且后续取不到、列表少一条。
+func TestDeleteRemovesOne(t *testing.T) {
+	st := newTestStore(t)
+	h := newHandler(st, config.Auth{})
+	id1 := seedReq(st)
+	seedReq(st)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/requests/"+itoa(id1), nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("DELETE 期望 204，得到 %d", rec.Code)
+	}
+	if list := getJSONArray(t, h, "/api/requests"); len(list) != 1 {
+		t.Errorf("删除后列表应剩 1 条，得到 %d", len(list))
+	}
+	// 删不存在的也应 204（幂等）
+	req = httptest.NewRequest(http.MethodDelete, "/api/requests/999999", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("删不存在期望 204，得到 %d", rec.Code)
+	}
+}
+
+func itoa(i int64) string { return strconv.FormatInt(i, 10) }
+
+func getJSON(t *testing.T, h http.Handler, path string) map[string]any {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+	var m map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+		t.Fatalf("解析 %s 响应失败: %v (body=%s)", path, err, rec.Body.String())
+	}
+	return m
+}
+
+func getJSONArray(t *testing.T, h http.Handler, path string) []map[string]any {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+	var a []map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &a); err != nil {
+		t.Fatalf("解析 %s 响应失败: %v (body=%s)", path, err, rec.Body.String())
+	}
+	return a
 }
