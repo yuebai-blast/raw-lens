@@ -128,6 +128,7 @@ func (a *authGate) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    tok,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   a.cfg.CookieSecure,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   a.cfg.SessionTTLHours * 3600,
 	})
@@ -140,7 +141,7 @@ func (a *authGate) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookieName, Value: "", Path: "/",
-		HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1,
+		HttpOnly: true, Secure: a.cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1,
 	})
 	w.WriteHeader(http.StatusNoContent)
 }

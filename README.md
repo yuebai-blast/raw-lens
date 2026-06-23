@@ -76,13 +76,22 @@ auth:
   username: admin
   password: your-password   # 明文
   session_ttl_hours: 168    # 会话有效期（小时），默认 7 天
+  cookie_secure: false      # 公网经 HTTPS 反代访问时设 true（见下）
 ```
 
 - 开启后访问面板需先登录；登录态用 httpOnly cookie 维持。
 - 会话存在内存，**进程重启后需重新登录**。
 - `enabled: true` 却没填 `username`/`password` 会启动报错。
 - 鉴权只作用于面板端口（`:9101`）；抓包端口（`:9100`）不受影响。
-- cookie 未设 `Secure` 标志，面板按内网/本机 HTTP 部署定位；如挂 HTTPS 反代需自行在反代层处理。
+
+### 公网部署务必走 HTTPS
+
+raw-lens 自身只监听明文 HTTP。若面板要通过**公网域名**访问，必须在前面挂一个做 TLS 终结的反向代理（nginx / Caddy / Traefik 等），让「浏览器 ↔ 服务器」这段是 `https://`；否则用户名、密码、会话 cookie 都会在公网上**明文传输**，可被链路上任何人窃取。代理 ↔ raw-lens 这段在服务器内部走明文即可。
+
+配好 HTTPS 后，把 `cookie_secure` 设为 `true`：会话 cookie 会带上 `Secure` 标志，浏览器只在 HTTPS 连接里发送它，避免某次意外的明文 http 请求泄露 cookie。
+
+- `cookie_secure: false`（默认）：cookie 不带 `Secure`，适合内网/本机 HTTP 访问与本地开发。
+- `cookie_secure: true`：仅在 HTTPS 下发送 cookie。注意此时**纯 http 访问公网域名将无法登录**（这是预期的——公网本就该禁止明文访问）；`http://localhost` 本地开发仍可正常登录（浏览器把 localhost 视为安全上下文）。
 
 ## 抓 HTTPS 原始请求
 

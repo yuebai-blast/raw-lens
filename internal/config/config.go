@@ -63,6 +63,7 @@ type Auth struct {
 	Username        string `yaml:"username"`          // 登录用户名
 	Password        string `yaml:"password"`          // 登录密码（明文）
 	SessionTTLHours int    `yaml:"session_ttl_hours"` // 会话有效期（小时），重启进程后会话清空需重登
+	CookieSecure    bool   `yaml:"cookie_secure"`     // true 时会话 cookie 加 Secure（仅 HTTPS 下发送）；公网经 HTTPS 反代访问应设 true
 }
 
 type Config struct {
