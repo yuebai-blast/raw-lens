@@ -184,3 +184,34 @@ func TestLogoutInvalidatesSession(t *testing.T) {
 		t.Fatalf("登出后旧会话应失效，得到 %d", rec.Code)
 	}
 }
+
+// login 函数：向给定 handler 发一次正确的登录请求，返回收到的 cookie。
+func login(t *testing.T, h http.Handler) *http.Cookie {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/login",
+		strings.NewReader(`{"username":"admin","password":"secret"}`)))
+	cookies := rec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("登录应返回 cookie")
+	}
+	return cookies[0]
+}
+
+func TestLoginCookieSecureDefaultOff(t *testing.T) {
+	// 默认（CookieSecure 未配=false）：cookie 不带 Secure，便于内网 HTTP / 本地开发访问。
+	h := enabledHandler(t)
+	if c := login(t, h); c.Secure {
+		t.Fatalf("默认不应设 Secure")
+	}
+}
+
+func TestLoginCookieSecureOn(t *testing.T) {
+	// CookieSecure=true（公网 HTTPS 反代场景）：cookie 必须带 Secure。
+	h := newHandler(newTestStore(t), config.Auth{
+		Enabled: true, Username: "admin", Password: "secret", SessionTTLHours: 168, CookieSecure: true,
+	})
+	if c := login(t, h); !c.Secure {
+		t.Fatalf("CookieSecure=true 时 cookie 应带 Secure")
+	}
+}
