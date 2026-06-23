@@ -14,6 +14,13 @@ const d = computed(() => store.current)
 function at(t: string): string {
   return new Date(t).toLocaleString('en-GB')
 }
+
+// 名称编辑：失焦/回车时若有变化才提交。
+function commitName(e: Event) {
+  if (!d.value) return
+  const next = (e.target as HTMLInputElement).value.trim()
+  if (next !== d.value.name) void store.setName(d.value.id, next)
+}
 </script>
 
 <template>
@@ -27,6 +34,19 @@ function at(t: string): string {
           >{{ d.method || '?' }}</span>
           <span class="detail-target">{{ d.target || '/' }}</span>
           <span class="detail-proto">{{ d.proto }}</span>
+        </div>
+        <div class="detail-name">
+          <span class="name-label">NAME</span>
+          <input
+            :key="d.id"
+            class="name-input"
+            type="text"
+            maxlength="200"
+            placeholder="给这条请求起个名字…"
+            :value="d.name"
+            @blur="commitName"
+            @keyup.enter="($event.target as HTMLInputElement).blur()"
+          >
         </div>
         <div class="detail-meta">
           <span><b>#</b>{{ d.id }}</span>
@@ -147,6 +167,17 @@ function at(t: string): string {
   word-break: break-all;
 }
 .detail-proto { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-left: auto; }
+
+.detail-name { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.name-label { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--muted); flex: none; }
+.name-input {
+  flex: 1; min-width: 0; max-width: 360px;
+  font-family: var(--mono); font-size: 12px; color: var(--phosphor);
+  background: #0a0f0e; border: 1px solid var(--line); border-radius: 5px;
+  padding: 5px 10px; transition: border-color .12s, box-shadow .12s;
+}
+.name-input::placeholder { color: var(--muted); }
+.name-input:focus { outline: none; border-color: var(--phosphor-soft); box-shadow: 0 0 10px #34e0a122; }
 
 .detail-meta {
   display: flex; flex-wrap: wrap; gap: 6px 20px;

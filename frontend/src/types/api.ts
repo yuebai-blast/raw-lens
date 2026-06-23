@@ -6,6 +6,7 @@ export interface Summary {
   method: string
   target: string
   proto: string
+  name: string
   headerCount: number
   bodySize: number
   rawSize: number

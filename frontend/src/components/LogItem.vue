@@ -3,7 +3,7 @@ import type { Summary } from '@/types/api'
 import { fmtBytes, meterPct } from '@/utils/bytes'
 
 const props = defineProps<{ item: Summary; active: boolean; isNew: boolean }>()
-const emit = defineEmits<{ select: [id: number] }>()
+const emit = defineEmits<{ select: [id: number]; delete: [id: number] }>()
 
 function time(t: string): string {
   return new Date(t).toLocaleTimeString('en-GB')
@@ -16,12 +16,26 @@ function time(t: string): string {
     :class="{ active: props.active, 'is-new': props.isNew }"
     @click="emit('select', props.item.id)"
   >
+    <div
+      v-if="props.item.name"
+      class="item-name"
+      :title="props.item.name"
+    >
+      {{ props.item.name }}
+    </div>
     <div class="item-top">
       <span
         class="chip"
         :data-m="props.item.method || '?'"
       >{{ props.item.method || '?' }}</span>
       <span class="item-target">{{ props.item.target || '/' }}</span>
+      <button
+        class="item-del"
+        title="删除此记录"
+        @click.stop="emit('delete', props.item.id)"
+      >
+        ✕
+      </button>
     </div>
     <div class="item-meta">
       <span class="id">#{{ props.item.id }}</span>
@@ -59,7 +73,23 @@ function time(t: string): string {
   100% { background: transparent; box-shadow: inset 2px 0 0 transparent; }
 }
 
+.item-name {
+  font-family: var(--mono); font-size: 11px; color: var(--phosphor);
+  letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
 .item-top { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+
+/* 删除按钮：默认隐藏，hover 列表项时显现 */
+.item-del {
+  flex: none; margin-left: auto; padding: 2px 6px;
+  font-family: var(--mono); font-size: 11px; line-height: 1;
+  color: var(--muted); background: transparent;
+  border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
+  opacity: 0; transition: opacity .12s, color .12s, border-color .12s;
+}
+.item:hover .item-del { opacity: 1; }
+.item-del:hover { color: var(--red); border-color: #4a2a2a; }
 
 /* 注：.chip 基础样式在 global.css，此处仅 override detail-bar 内尺寸（若需要） */
 

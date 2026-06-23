@@ -24,6 +24,7 @@ type summaryDTO struct {
 	Method      string `json:"method"`
 	Target      string `json:"target"`
 	Proto       string `json:"proto"`
+	Name        string `json:"name"`
 	HeaderCount int    `json:"headerCount"`
 	BodySize    int    `json:"bodySize"`
 	RawSize     int    `json:"rawSize"`
@@ -51,6 +52,7 @@ func toSummary(c *store.CapturedRequest) summaryDTO {
 		Method:      c.Method,
 		Target:      c.Target,
 		Proto:       c.Proto,
+		Name:        c.Name,
 		HeaderCount: len(c.Headers),
 		BodySize:    len(c.Body),
 		RawSize:     len(c.Raw),
@@ -98,6 +100,34 @@ func newHandler(st *store.Store, auth config.Auth) http.Handler {
 		writeJSON(w, d)
 	})
 
+	mux.HandleFunc("PATCH /api/requests/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			http.Error(w, "bad id", http.StatusBadRequest)
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		var body struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "bad body", http.StatusBadRequest)
+			return
+		}
+		st.SetName(id, normalizeName(body.Name))
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	mux.HandleFunc("DELETE /api/requests/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			http.Error(w, "bad id", http.StatusBadRequest)
+			return
+		}
+		st.Delete(id)
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	mux.HandleFunc("POST /api/clear", func(w http.ResponseWriter, r *http.Request) {
 		st.Clear()
 		w.WriteHeader(http.StatusNoContent)
@@ -143,6 +173,15 @@ func spaFileServer() http.Handler {
 func Serve(addr string, st *store.Store, auth config.Auth) error {
 	log.Printf("dashboard 监听 %s", addr)
 	return http.ListenAndServe(addr, newHandler(st, auth))
+}
+
+// normalizeName 去掉名称首尾空白，并截断到 200 个字符（按 rune 计，避免截断多字节字符）。
+func normalizeName(s string) string {
+	s = strings.TrimSpace(s)
+	if r := []rune(s); len(r) > 200 {
+		s = string(r[:200])
+	}
+	return s
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

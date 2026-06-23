@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"database/sql"
 	"sync"
 	"testing"
 	"time"
@@ -120,6 +121,83 @@ func TestPersistenceAcrossReopen(t *testing.T) {
 	}
 	if id := s2.Add(sampleReq()); id != 3 {
 		t.Errorf("自增 id 应续接为 3，得到 %d", id)
+	}
+}
+
+func TestSetName(t *testing.T) {
+	s := newMemStore(t, 500)
+	id := s.Add(sampleReq())
+	// 新抓到的请求默认无名称
+	if got := s.Get(id); got == nil || got.Name != "" {
+		t.Fatalf("新记录 Name 应为空串，得到 %q", got.Name)
+	}
+	s.SetName(id, "登录接口")
+	got := s.Get(id)
+	if got == nil || got.Name != "登录接口" {
+		t.Errorf("SetName 后 Name 应为 \"登录接口\"，得到 %q", got.Name)
+	}
+	// List 也应带回名称
+	list := s.List()
+	if len(list) != 1 || list[0].Name != "登录接口" {
+		t.Errorf("List 应带回名称，得到 %+v", list)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	s := newMemStore(t, 500)
+	id1 := s.Add(sampleReq())
+	id2 := s.Add(sampleReq())
+	s.Delete(id1)
+	if s.Get(id1) != nil {
+		t.Errorf("Delete 后 id=%d 应取不到", id1)
+	}
+	if s.Get(id2) == nil {
+		t.Errorf("未删除的 id=%d 应仍在", id2)
+	}
+	if n := len(s.List()); n != 1 {
+		t.Errorf("Delete 后应剩 1 条，得到 %d", n)
+	}
+	// 删不存在的 id 不应 panic / 影响其它记录（幂等）
+	s.Delete(99999)
+	if n := len(s.List()); n != 1 {
+		t.Errorf("删不存在 id 后应仍剩 1 条，得到 %d", n)
+	}
+}
+
+func TestMigrateAddsNameColumnToOldDB(t *testing.T) {
+	path := t.TempDir() + "/old.db"
+	// 模拟老库：建一张不含 name 列的旧表，塞一条历史。
+	old, err := sql.Open("sqlite", dsnFor(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Exec(`CREATE TABLE captured_request (
+	  id INTEGER PRIMARY KEY AUTOINCREMENT,
+	  captured_at TEXT NOT NULL, remote_addr TEXT NOT NULL, tls INTEGER NOT NULL,
+	  request_line TEXT NOT NULL, method TEXT, target TEXT, proto TEXT,
+	  headers_json TEXT NOT NULL, body BLOB, raw BLOB NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Exec(`INSERT INTO captured_request
+	  (captured_at, remote_addr, tls, request_line, headers_json, raw)
+	  VALUES ('2026-06-19T10:00:00Z','127.0.0.1:1',0,'GET / HTTP/1.1','[]','raw')`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+
+	// New 应平滑补上 name 列，老数据可读、可设名。
+	s, err := New(Options{Path: path, Max: 500})
+	if err != nil {
+		t.Fatalf("New 应能升级老库: %v", err)
+	}
+	defer s.Close()
+	list := s.List()
+	if len(list) != 1 || list[0].Name != "" {
+		t.Fatalf("升级后老记录应可读且 Name 为空，得到 %+v", list)
+	}
+	s.SetName(list[0].ID, "历史请求")
+	if got := s.Get(list[0].ID); got == nil || got.Name != "历史请求" {
+		t.Errorf("升级后应能设名，得到 %+v", got)
 	}
 }
 

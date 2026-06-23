@@ -28,6 +28,7 @@ type CapturedRequest struct {
 	Proto       string
 	Headers     [][2]string
 	Body        []byte
+	Name        string // 用户给该请求起的备注名，可空
 }
 
 // Options 是打开 Store 的参数。
@@ -43,7 +44,7 @@ type Store struct {
 }
 
 // selectCols 统一 SELECT 的列顺序，scanRow 依赖此顺序。
-const selectCols = `id, captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw`
+const selectCols = `id, captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw, name`
 
 const schema = `
 CREATE TABLE IF NOT EXISTS captured_request (
@@ -57,7 +58,8 @@ CREATE TABLE IF NOT EXISTS captured_request (
   proto        TEXT,                              -- 协议版本，可空
   headers_json TEXT    NOT NULL,                  -- header 数组 JSON，保序保大小写 [["Name","Val"],...]
   body         BLOB,                              -- body 原始字节，可空
-  raw          BLOB    NOT NULL                   -- 连接上读到的全量原始字节，逐字保真
+  raw          BLOB    NOT NULL,                  -- 连接上读到的全量原始字节，逐字保真
+  name         TEXT    NOT NULL DEFAULT ''        -- 用户给该请求起的备注名，默认空串
 );
 CREATE INDEX IF NOT EXISTS idx_captured_request_id_desc ON captured_request(id DESC);
 `
@@ -90,7 +92,36 @@ func New(opts Options) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Store{db: db, max: max}, nil
+}
+
+// migrate 对老库做平滑升级：缺 name 列时补上（CREATE TABLE IF NOT EXISTS 不会给已存在的表加列）。
+func migrate(db *sql.DB) error {
+	if hasColumn(db, "captured_request", "name") {
+		return nil
+	}
+	_, err := db.Exec(`ALTER TABLE captured_request ADD COLUMN name TEXT NOT NULL DEFAULT ''`)
+	return err
+}
+
+// hasColumn 查表是否已有某列。
+func hasColumn(db *sql.DB, table, col string) bool {
+	rows, err := db.Query(`SELECT name FROM pragma_table_info(?)`, table)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		if rows.Scan(&name) == nil && name == col {
+			return true
+		}
+	}
+	return false
 }
 
 // dsnFor 文件库附带 WAL 与 busy_timeout；:memory: 不需要。
@@ -114,10 +145,10 @@ func (s *Store) Add(cr *CapturedRequest) int64 {
 	}
 	res, err := s.db.Exec(
 		`INSERT INTO captured_request
-		   (captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		   (captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw, name)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		cr.Time.UTC().Format(time.RFC3339Nano), cr.RemoteAddr, tlsInt,
-		cr.RequestLine, cr.Method, cr.Target, cr.Proto, string(hj), cr.Body, cr.Raw)
+		cr.RequestLine, cr.Method, cr.Target, cr.Proto, string(hj), cr.Body, cr.Raw, cr.Name)
 	if err != nil {
 		log.Printf("store: 写入失败: %v", err)
 		return 0
@@ -188,6 +219,20 @@ func (s *Store) Clear() {
 	}
 }
 
+// SetName 给指定记录设置备注名；出错记日志。
+func (s *Store) SetName(id int64, name string) {
+	if _, err := s.db.Exec(`UPDATE captured_request SET name = ? WHERE id = ?`, name, id); err != nil {
+		log.Printf("store: 设置 #%d 名称失败: %v", id, err)
+	}
+}
+
+// Delete 删除指定记录；删不存在的 id 不视为错误（幂等）。出错记日志。
+func (s *Store) Delete(id int64) {
+	if _, err := s.db.Exec(`DELETE FROM captured_request WHERE id = ?`, id); err != nil {
+		log.Printf("store: 删除 #%d 失败: %v", id, err)
+	}
+}
+
 // Close 关闭底层数据库。
 func (s *Store) Close() error {
 	return s.db.Close()
@@ -208,7 +253,7 @@ func scanRow(sc scanner) (*CapturedRequest, error) {
 		method, target, proto sql.NullString
 	)
 	if err := sc.Scan(&cr.ID, &capturedAt, &cr.RemoteAddr, &tlsInt, &cr.RequestLine,
-		&method, &target, &proto, &headersJSON, &cr.Body, &cr.Raw); err != nil {
+		&method, &target, &proto, &headersJSON, &cr.Body, &cr.Raw, &cr.Name); err != nil {
 		return nil, err
 	}
 	cr.Method, cr.Target, cr.Proto = method.String, target.String, proto.String
