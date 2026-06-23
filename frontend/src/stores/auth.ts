@@ -13,11 +13,12 @@ export const useAuthStore = defineStore('auth', {
     async fetchSession() {
       try {
         const res = await fetch('/api/session')
+        if (!res.ok) throw new Error(`session ${res.status}`)
         const info = (await res.json()) as SessionInfo
         this.enabled = info.enabled
         this.authenticated = info.authenticated
       } catch {
-        // 拉不到会话信息（后端不可达）时保守当作未开启鉴权，避免把人锁在登录页外用不了
+        // 拉不到会话信息（后端不可达、或返回非2xx）时保守当作未开启鉴权，避免把人锁在登录页外用不了
         this.enabled = false
         this.authenticated = true
       }

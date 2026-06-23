@@ -27,6 +27,15 @@ describe('useAuthStore', () => {
     expect(s.ready).toBe(true)
   })
 
+  it('fetchSession 后端返回非2xx时保守降级为免鉴权且 ready', async () => {
+    vi.stubGlobal('fetch', mockFetch({ enabled: true, authenticated: true }, false))
+    const s = useAuthStore()
+    await s.fetchSession()
+    expect(s.enabled).toBe(false)
+    expect(s.authenticated).toBe(true)
+    expect(s.ready).toBe(true)
+  })
+
   it('login 成功置 authenticated 并返回 true', async () => {
     vi.stubGlobal('fetch', mockFetch({ authenticated: true }))
     const s = useAuthStore()
