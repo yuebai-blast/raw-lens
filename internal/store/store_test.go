@@ -3,10 +3,13 @@ package store
 import (
 	"bytes"
 	"database/sql"
+	"regexp"
 	"sync"
 	"testing"
 	"time"
 )
+
+var idPattern = regexp.MustCompile(`^[0-9a-f]{12}$`)
 
 func sampleReq() *CapturedRequest {
 	return &CapturedRequest{
@@ -37,12 +40,15 @@ func TestAddGetRoundTripFidelity(t *testing.T) {
 	s := newMemStore(t, 500)
 	want := sampleReq()
 	id := s.Add(want)
-	if id <= 0 {
-		t.Fatalf("Add 返回非法 id: %d", id)
+	if !idPattern.MatchString(id) {
+		t.Fatalf("Add 返回的 id 应为 12 位 hex 串，得到 %q", id)
 	}
 	got := s.Get(id)
 	if got == nil {
 		t.Fatal("Get 返回 nil")
+	}
+	if got.ID != id {
+		t.Errorf("Get 回来的 ID 不一致: got=%q want=%q", got.ID, id)
 	}
 	if !bytes.Equal(got.Raw, want.Raw) {
 		t.Errorf("Raw 不一致:\n got=%q\nwant=%q", got.Raw, want.Raw)
@@ -66,9 +72,24 @@ func TestAddGetRoundTripFidelity(t *testing.T) {
 	}
 }
 
+func TestAddGeneratesUniqueRandomIDs(t *testing.T) {
+	s := newMemStore(t, 500)
+	seen := make(map[string]bool)
+	for i := 0; i < 200; i++ {
+		id := s.Add(sampleReq())
+		if !idPattern.MatchString(id) {
+			t.Fatalf("id 格式非法: %q", id)
+		}
+		if seen[id] {
+			t.Fatalf("id 重复: %q", id)
+		}
+		seen[id] = true
+	}
+}
+
 func TestListOrderAndLimit(t *testing.T) {
 	s := newMemStore(t, 3)
-	var ids []int64
+	var ids []string
 	for i := 0; i < 5; i++ {
 		ids = append(ids, s.Add(sampleReq()))
 	}
@@ -76,16 +97,16 @@ func TestListOrderAndLimit(t *testing.T) {
 	if len(list) != 3 {
 		t.Fatalf("List 应返回最近 3 条，得到 %d", len(list))
 	}
-	// 旧→新：应为最后插入的三个 id
+	// 旧→新：应为最后插入的三个 id（时序由内部 seq 维持，与随机 id 无关）
 	wantIDs := ids[2:]
 	for i, cr := range list {
 		if cr.ID != wantIDs[i] {
-			t.Errorf("List[%d].ID=%d，期望 %d（应旧→新）", i, cr.ID, wantIDs[i])
+			t.Errorf("List[%d].ID=%q，期望 %q（应旧→新）", i, cr.ID, wantIDs[i])
 		}
 	}
 	// 被裁掉的最旧记录取不到
 	if s.Get(ids[0]) != nil {
-		t.Errorf("最旧记录 id=%d 应已被保留策略删除", ids[0])
+		t.Errorf("最旧记录 id=%q 应已被保留策略删除", ids[0])
 	}
 }
 
@@ -101,33 +122,9 @@ func TestClear(t *testing.T) {
 	}
 }
 
-func TestPersistenceAcrossReopen(t *testing.T) {
-	path := t.TempDir() + "/p.db"
-	s1, err := New(Options{Path: path, Max: 500})
-	if err != nil {
-		t.Fatal(err)
-	}
-	s1.Add(sampleReq())
-	s1.Add(sampleReq())
-	s1.Close()
-
-	s2, err := New(Options{Path: path, Max: 500})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s2.Close()
-	if len(s2.List()) != 2 {
-		t.Fatalf("重开后应有 2 条历史，得到 %d", len(s2.List()))
-	}
-	if id := s2.Add(sampleReq()); id != 3 {
-		t.Errorf("自增 id 应续接为 3，得到 %d", id)
-	}
-}
-
 func TestSetName(t *testing.T) {
 	s := newMemStore(t, 500)
 	id := s.Add(sampleReq())
-	// 新抓到的请求默认无名称
 	if got := s.Get(id); got == nil || got.Name != "" {
 		t.Fatalf("新记录 Name 应为空串，得到 %q", got.Name)
 	}
@@ -136,7 +133,6 @@ func TestSetName(t *testing.T) {
 	if got == nil || got.Name != "登录接口" {
 		t.Errorf("SetName 后 Name 应为 \"登录接口\"，得到 %q", got.Name)
 	}
-	// List 也应带回名称
 	list := s.List()
 	if len(list) != 1 || list[0].Name != "登录接口" {
 		t.Errorf("List 应带回名称，得到 %+v", list)
@@ -149,24 +145,52 @@ func TestDelete(t *testing.T) {
 	id2 := s.Add(sampleReq())
 	s.Delete(id1)
 	if s.Get(id1) != nil {
-		t.Errorf("Delete 后 id=%d 应取不到", id1)
+		t.Errorf("Delete 后 id=%q 应取不到", id1)
 	}
 	if s.Get(id2) == nil {
-		t.Errorf("未删除的 id=%d 应仍在", id2)
+		t.Errorf("未删除的 id=%q 应仍在", id2)
 	}
 	if n := len(s.List()); n != 1 {
 		t.Errorf("Delete 后应剩 1 条，得到 %d", n)
 	}
 	// 删不存在的 id 不应 panic / 影响其它记录（幂等）
-	s.Delete(99999)
+	s.Delete("ffffffffffff")
 	if n := len(s.List()); n != 1 {
 		t.Errorf("删不存在 id 后应仍剩 1 条，得到 %d", n)
 	}
 }
 
-func TestMigrateAddsNameColumnToOldDB(t *testing.T) {
+func TestPersistenceAcrossReopen(t *testing.T) {
+	path := t.TempDir() + "/p.db"
+	s1, err := New(Options{Path: path, Max: 500})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id1 := s1.Add(sampleReq())
+	s1.Add(sampleReq())
+	s1.Close()
+
+	s2, err := New(Options{Path: path, Max: 500})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s2.Close()
+	if len(s2.List()) != 2 {
+		t.Fatalf("重开后应有 2 条历史，得到 %d", len(s2.List()))
+	}
+	// 重开后历史 id 仍可读
+	if s2.Get(id1) == nil {
+		t.Errorf("重开后应能取到历史 id=%q", id1)
+	}
+	// 新增仍得到合法随机 id
+	if id := s2.Add(sampleReq()); !idPattern.MatchString(id) {
+		t.Errorf("重开后 Add 应返回合法随机 id，得到 %q", id)
+	}
+}
+
+func TestMigrateOldAutoIncrementDB(t *testing.T) {
 	path := t.TempDir() + "/old.db"
-	// 模拟老库：建一张不含 name 列的旧表，塞一条历史。
+	// 模拟旧库：id 为自增整数主键、无 seq、无 name，塞两条历史。
 	old, err := sql.Open("sqlite", dsnFor(path))
 	if err != nil {
 		t.Fatal(err)
@@ -178,26 +202,46 @@ func TestMigrateAddsNameColumnToOldDB(t *testing.T) {
 	  headers_json TEXT NOT NULL, body BLOB, raw BLOB NOT NULL)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := old.Exec(`INSERT INTO captured_request
-	  (captured_at, remote_addr, tls, request_line, headers_json, raw)
-	  VALUES ('2026-06-19T10:00:00Z','127.0.0.1:1',0,'GET / HTTP/1.1','[]','raw')`); err != nil {
-		t.Fatal(err)
+	for i, addr := range []string{"10.0.0.1:1", "10.0.0.2:2"} {
+		if _, err := old.Exec(`INSERT INTO captured_request
+		  (captured_at, remote_addr, tls, request_line, headers_json, raw)
+		  VALUES (?, ?, 0, 'GET / HTTP/1.1', '[]', ?)`,
+			time.Date(2026, 6, 19, 10, i, 0, 0, time.UTC).Format(time.RFC3339Nano), addr, "raw"+addr); err != nil {
+			t.Fatal(err)
+		}
 	}
 	old.Close()
 
-	// New 应平滑补上 name 列，老数据可读、可设名。
+	// New 应平滑重建为随机 id 结构：数据条数与时序保留，id 变为 12 位 hex。
 	s, err := New(Options{Path: path, Max: 500})
 	if err != nil {
-		t.Fatalf("New 应能升级老库: %v", err)
+		t.Fatalf("New 应能升级旧库: %v", err)
 	}
 	defer s.Close()
 	list := s.List()
-	if len(list) != 1 || list[0].Name != "" {
-		t.Fatalf("升级后老记录应可读且 Name 为空，得到 %+v", list)
+	if len(list) != 2 {
+		t.Fatalf("升级后应保留 2 条历史，得到 %d", len(list))
 	}
+	// 时序保留：旧→新应为 10.0.0.1 在前
+	if list[0].RemoteAddr != "10.0.0.1:1" || list[1].RemoteAddr != "10.0.0.2:2" {
+		t.Errorf("升级后时序应保留，得到 %q,%q", list[0].RemoteAddr, list[1].RemoteAddr)
+	}
+	for _, cr := range list {
+		if !idPattern.MatchString(cr.ID) {
+			t.Errorf("升级后 id 应为 12 位 hex，得到 %q", cr.ID)
+		}
+		if cr.Name != "" {
+			t.Errorf("升级后 name 应为空串，得到 %q", cr.Name)
+		}
+	}
+	// 升级后仍可正常增删改
 	s.SetName(list[0].ID, "历史请求")
 	if got := s.Get(list[0].ID); got == nil || got.Name != "历史请求" {
 		t.Errorf("升级后应能设名，得到 %+v", got)
+	}
+	newID := s.Add(sampleReq())
+	if !idPattern.MatchString(newID) {
+		t.Errorf("升级后 Add 应返回合法随机 id，得到 %q", newID)
 	}
 }
 

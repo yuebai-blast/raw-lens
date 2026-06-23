@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useCaptureStore } from '@/stores/captures'
+import { useConfirmStore } from '@/stores/confirm'
 import LogItem from './LogItem.vue'
 
 const store = useCaptureStore()
+const confirm = useConfirmStore()
 const router = useRouter()
 
 // 列表新→旧：后端已按新在前返回，直接用。
-function select(id: number) {
-  void router.push({ name: 'detail', params: { id: String(id) } })
+function select(id: string) {
+  void router.push({ name: 'detail', params: { id } })
 }
 
 // 删除前二次确认，避免误删；确认后调用 store.remove。
-function remove(id: number) {
-  if (window.confirm(`确认删除记录 #${id}？`)) void store.remove(id)
+async function remove(id: string) {
+  if (await confirm.confirm({ title: '删除记录', message: `确认删除记录 #${id}？` })) {
+    await store.remove(id)
+  }
 }
 </script>
 

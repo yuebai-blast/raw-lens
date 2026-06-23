@@ -1,5 +1,5 @@
 export interface Summary {
-  id: number
+  id: string
   time: string
   remoteAddr: string
   tls: boolean

@@ -15,7 +15,7 @@ function mockFetchOnce(json: unknown, ok = true, status?: number) {
 }
 
 const sample: Summary[] = [
-  { id: 1, time: '2026-06-19T00:00:00Z', remoteAddr: '1.2.3.4:5', tls: false, method: 'GET', target: '/a', proto: 'HTTP/1.1', name: '', headerCount: 2, bodySize: 0, rawSize: 30 },
+  { id: 'aaaaaaaaaaaa', time: '2026-06-19T00:00:00Z', remoteAddr: '1.2.3.4:5', tls: false, method: 'GET', target: '/a', proto: 'HTTP/1.1', name: '', headerCount: 2, bodySize: 0, rawSize: 30 },
 ]
 
 describe('useCaptureStore', () => {
@@ -48,19 +48,19 @@ describe('useCaptureStore', () => {
     const s = useCaptureStore()
     vi.stubGlobal('fetch', mockFetchOnce(sample))
     await s.refresh()
-    const grown: Summary[] = [{ ...sample[0], id: 2 }, ...sample]
+    const grown: Summary[] = [{ ...sample[0], id: 'bbbbbbbbbbbb' }, ...sample]
     vi.stubGlobal('fetch', mockFetchOnce(grown))
     await s.refresh()
-    expect(s.newIds.has(2)).toBe(true)
-    expect(s.newIds.has(1)).toBe(false)
+    expect(s.newIds.has('bbbbbbbbbbbb')).toBe(true)
+    expect(s.newIds.has('aaaaaaaaaaaa')).toBe(false)
   })
 
   it('fetchDetail 网络异常时不抛、置空 current', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
     const s = useCaptureStore()
-    await s.fetchDetail(1)
+    await s.fetchDetail('aaaaaaaaaaaa')
     expect(s.current).toBeNull()
-    expect(s.activeId).toBe(1)
+    expect(s.activeId).toBe('aaaaaaaaaaaa')
   })
 
   it('fetchDetail 收到 401 时触发未登录处理（authenticated 置 false），而非静默置空', async () => {
@@ -68,7 +68,7 @@ describe('useCaptureStore', () => {
     const s = useCaptureStore()
     const auth = useAuthStore()
     auth.authenticated = true // 初始已登录
-    await s.fetchDetail(1)
+    await s.fetchDetail('aaaaaaaaaaaa')
     // 401 应触发 handleUnauthorized：authenticated 被置 false
     expect(auth.authenticated).toBe(false)
     // current 不应被置空（handleUnauthorized 不改 current，这是与普通 404 的区别）
@@ -90,23 +90,23 @@ describe('useCaptureStore', () => {
     await s.refresh()
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => null })
     vi.stubGlobal('fetch', fetchMock)
-    await s.setName(1, '登录接口')
-    expect(fetchMock).toHaveBeenCalledWith('/api/requests/1', expect.objectContaining({ method: 'PATCH' }))
+    await s.setName('aaaaaaaaaaaa', '登录接口')
+    expect(fetchMock).toHaveBeenCalledWith('/api/requests/aaaaaaaaaaaa', expect.objectContaining({ method: 'PATCH' }))
     expect(s.list[0].name).toBe('登录接口')
   })
 
   it('remove 成功后从 list 移除该项；删的是当前项时清空 current', async () => {
     const s = useCaptureStore()
-    const grown: Summary[] = [{ ...sample[0], id: 2 }, ...sample]
+    const grown: Summary[] = [{ ...sample[0], id: 'bbbbbbbbbbbb' }, ...sample]
     vi.stubGlobal('fetch', mockFetchOnce(grown))
     await s.refresh()
-    s.activeId = 1
+    s.activeId = 'aaaaaaaaaaaa'
     s.current = { ...sample[0], requestLine: '', headers: [], rawBase64: '', bodyBase64: '' }
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => null })
     vi.stubGlobal('fetch', fetchMock)
-    await s.remove(1)
-    expect(fetchMock).toHaveBeenCalledWith('/api/requests/1', expect.objectContaining({ method: 'DELETE' }))
-    expect(s.list.map((i) => i.id)).toEqual([2])
+    await s.remove('aaaaaaaaaaaa')
+    expect(fetchMock).toHaveBeenCalledWith('/api/requests/aaaaaaaaaaaa', expect.objectContaining({ method: 'DELETE' }))
+    expect(s.list.map((i) => i.id)).toEqual(['bbbbbbbbbbbb'])
     expect(s.current).toBeNull()
     expect(s.activeId).toBeNull()
   })

@@ -59,9 +59,9 @@ func handleConn(conn net.Conn, st *store.Store) {
 	_, cr.TLS = conn.(*tls.Conn)
 	id := st.Add(cr)
 	if err != nil {
-		log.Printf("#%d 来自 %s（读取未完整: %v，已按收到的字节保存）", id, cr.RemoteAddr, err)
+		log.Printf("#%s 来自 %s（读取未完整: %v，已按收到的字节保存）", id, cr.RemoteAddr, err)
 	} else {
-		log.Printf("#%d %s %s 来自 %s（%d 字节）", id, cr.Method, cr.Target, cr.RemoteAddr, len(raw))
+		log.Printf("#%s %s %s 来自 %s（%d 字节）", id, cr.Method, cr.Target, cr.RemoteAddr, len(raw))
 	}
 	writeAck(conn, id)
 }
@@ -226,8 +226,8 @@ func parseCaptured(raw, headerBlock, body []byte, remote string) *store.Captured
 }
 
 // writeAck 回一个最小的 200 响应。用 Connection: close，一条连接处理一条请求。
-func writeAck(conn net.Conn, id int64) {
-	body := fmt.Sprintf("raw-lens captured request #%d\n", id)
+func writeAck(conn net.Conn, id string) {
+	body := fmt.Sprintf("raw-lens captured request #%s\n", id)
 	fmt.Fprintf(conn,
 		"HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\nContent-Length: %d\r\n\r\n%s",
 		len(body), body)

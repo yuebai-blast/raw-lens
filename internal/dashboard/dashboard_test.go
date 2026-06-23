@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 	"github.com/yuebai-blast/raw-lens/internal/store"
 )
 
-func seedReq(st *store.Store) int64 {
+func seedReq(st *store.Store) string {
 	return st.Add(&store.CapturedRequest{
 		Time:        time.Now(),
 		RemoteAddr:  "127.0.0.1:1",
@@ -85,7 +84,7 @@ func TestPatchSetsName(t *testing.T) {
 	h := newHandler(st, config.Auth{})
 	id := seedReq(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/api/requests/"+itoa(id), strings.NewReader(`{"name":"  登录接口  "}`))
+	req := httptest.NewRequest(http.MethodPatch, "/api/requests/"+id, strings.NewReader(`{"name":"  登录接口  "}`))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
@@ -93,7 +92,7 @@ func TestPatchSetsName(t *testing.T) {
 	}
 
 	// 详情应带回去掉首尾空格的名称
-	detail := getJSON(t, h, "/api/requests/"+itoa(id))
+	detail := getJSON(t, h, "/api/requests/"+id)
 	if detail["name"] != "登录接口" {
 		t.Errorf("详情 name 期望 \"登录接口\"，得到 %v", detail["name"])
 	}
@@ -104,14 +103,25 @@ func TestPatchSetsName(t *testing.T) {
 	}
 }
 
-// PATCH 非法 id 返回 400。
-func TestPatchBadID(t *testing.T) {
+// PATCH 未知 id：id 现在是随机串，任意非空形状都合法，查不到即无操作返回 204。
+func TestPatchUnknownID(t *testing.T) {
 	h := newHandler(newTestStore(t), config.Auth{})
-	req := httptest.NewRequest(http.MethodPatch, "/api/requests/abc", strings.NewReader(`{"name":"x"}`))
+	req := httptest.NewRequest(http.MethodPatch, "/api/requests/deadbeef0000", strings.NewReader(`{"name":"x"}`))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("非法 id 期望 400，得到 %d", rec.Code)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("PATCH 未知 id 期望 204，得到 %d", rec.Code)
+	}
+}
+
+// GET 未知 id 仍返回 404。
+func TestGetUnknownID(t *testing.T) {
+	h := newHandler(newTestStore(t), config.Auth{})
+	req := httptest.NewRequest(http.MethodGet, "/api/requests/deadbeef0000", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET 未知 id 期望 404，得到 %d", rec.Code)
 	}
 }
 
@@ -122,7 +132,7 @@ func TestDeleteRemovesOne(t *testing.T) {
 	id1 := seedReq(st)
 	seedReq(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/requests/"+itoa(id1), nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/requests/"+id1, nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
@@ -132,15 +142,13 @@ func TestDeleteRemovesOne(t *testing.T) {
 		t.Errorf("删除后列表应剩 1 条，得到 %d", len(list))
 	}
 	// 删不存在的也应 204（幂等）
-	req = httptest.NewRequest(http.MethodDelete, "/api/requests/999999", nil)
+	req = httptest.NewRequest(http.MethodDelete, "/api/requests/ffffffffffff", nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("删不存在期望 204，得到 %d", rec.Code)
 	}
 }
-
-func itoa(i int64) string { return strconv.FormatInt(i, 10) }
 
 func getJSON(t *testing.T, h http.Handler, path string) map[string]any {
 	t.Helper()

@@ -8,10 +8,10 @@ const POLL_INTERVAL = 1500
 interface State {
   list: Summary[]
   current: Detail | null
-  activeId: number | null
+  activeId: string | null
   status: 'CAPTURING' | 'OFFLINE'
-  newIds: Set<number>
-  knownIds: Set<number>
+  newIds: Set<string>
+  knownIds: Set<string>
   firstLoad: boolean
   timer: number | null
 }
@@ -58,7 +58,7 @@ export const useCaptureStore = defineStore('captures', {
       this.firstLoad = false
       this.list = items
     },
-    async fetchDetail(id: number) {
+    async fetchDetail(id: string) {
       this.activeId = id
       try {
         const res = await fetch('/api/requests/' + id)
@@ -78,7 +78,7 @@ export const useCaptureStore = defineStore('captures', {
       }
     },
     // setName 给某条记录设置备注名，成功后同步更新本地 list 与 current。
-    async setName(id: number, name: string) {
+    async setName(id: string, name: string) {
       try {
         const res = await fetch('/api/requests/' + id, {
           method: 'PATCH',
@@ -98,7 +98,7 @@ export const useCaptureStore = defineStore('captures', {
       if (this.current && this.current.id === id) this.current.name = name
     },
     // remove 删除某条记录，成功后从 list 移除；若删的是当前项则清空详情并回到列表。
-    async remove(id: number) {
+    async remove(id: string) {
       try {
         const res = await fetch('/api/requests/' + id, { method: 'DELETE' })
         if (res.status === 401) {
