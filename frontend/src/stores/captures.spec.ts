@@ -120,4 +120,18 @@ describe('useCaptureStore', () => {
     expect(s.list).toHaveLength(0)
     expect(s.current).toBeNull()
   })
+
+  it('fetchMeta 成功后写入 captureUrl', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce({ captureUrl: 'https://xxx.xx.com:9100' }))
+    const s = useCaptureStore()
+    await s.fetchMeta()
+    expect(s.captureUrl).toBe('https://xxx.xx.com:9100')
+  })
+
+  it('fetchMeta 失败时静默，captureUrl 保持空', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
+    const s = useCaptureStore()
+    await s.fetchMeta()
+    expect(s.captureUrl).toBe('')
+  })
 })

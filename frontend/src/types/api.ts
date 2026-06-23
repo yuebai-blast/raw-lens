@@ -28,3 +28,7 @@ export interface SessionInfo {
   enabled: boolean
   authenticated: boolean
 }
+
+export interface Meta {
+  captureUrl: string
+}

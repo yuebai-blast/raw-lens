@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { Summary, Detail } from '@/types/api'
+import type { Summary, Detail, Meta } from '@/types/api'
 import router from '@/router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -14,6 +14,7 @@ interface State {
   knownIds: Set<string>
   firstLoad: boolean
   timer: number | null
+  captureUrl: string
 }
 
 export const useCaptureStore = defineStore('captures', {
@@ -26,6 +27,7 @@ export const useCaptureStore = defineStore('captures', {
     knownIds: new Set(),
     firstLoad: true,
     timer: null,
+    captureUrl: '',
   }),
   actions: {
     // handleUnauthorized 是 401 响应的共享处理逻辑：停轮询、标记未登录、跳回登录页。
@@ -127,8 +129,19 @@ export const useCaptureStore = defineStore('captures', {
       this.knownIds = new Set()
       this.firstLoad = true
     },
+    // fetchMeta 取面板元信息（抓包端口对外展示地址），失败静默——只是顶栏文案，不阻塞主流程。
+    async fetchMeta() {
+      try {
+        const res = await fetch('/api/meta')
+        if (!res.ok) return
+        this.captureUrl = ((await res.json()) as Meta).captureUrl
+      } catch {
+        // 网络异常时吞掉，captureUrl 保持空、顶栏不展示该块。
+      }
+    },
     startPolling() {
       if (this.timer !== null) return
+      void this.fetchMeta() // 一次性初始化，不进轮询
       void this.refresh()
       this.timer = window.setInterval(() => void this.refresh(), POLL_INTERVAL)
     },

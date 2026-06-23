@@ -2,12 +2,16 @@
 import { useCaptureStore } from '@/stores/captures'
 import { useAuthStore } from '@/stores/auth'
 import { useConfirmStore } from '@/stores/confirm'
+import { useCopy } from '@/composables/useCopy'
 import { useRouter } from 'vue-router'
 
 const store = useCaptureStore()
 const auth = useAuthStore()
 const confirm = useConfirmStore()
 const router = useRouter()
+
+// 监听地址点击复制：复制成功后 label 短暂切到 COPIED。
+const { copied, copy } = useCopy()
 
 async function onLogout() {
   await auth.logout()
@@ -94,6 +98,16 @@ async function onPurge() {
       </div>
     </div>
     <div class="readouts">
+      <button
+        v-if="store.captureUrl"
+        class="gauge gauge-listen"
+        type="button"
+        title="点击复制监听地址"
+        @click="copy(store.captureUrl)"
+      >
+        <span class="gauge-label">{{ copied ? 'COPIED' : 'LISTEN @' }}</span>
+        <span class="gauge-value listen-value">{{ store.captureUrl }}</span>
+      </button>
       <div class="gauge">
         <span class="gauge-label">CAPTURED</span>
         <span class="gauge-value">{{ store.list.length }}</span>
@@ -170,6 +184,17 @@ async function onPurge() {
 .gauge-value { font-family: var(--mono); font-size: 16px; font-weight: 500; color: var(--ink); }
 .gauge.status { flex-direction: row; align-items: center; gap: 8px; }
 .gauge.status .gauge-value { font-size: 12px; letter-spacing: 1.5px; color: var(--phosphor); }
+
+/* 监听地址：可点击复制的 gauge，按钮形态需重置默认样式并左对齐 */
+.gauge-listen {
+  align-items: flex-start; text-align: left; cursor: pointer;
+  max-width: 320px; transition: border-color .15s, box-shadow .15s;
+}
+.gauge-listen:hover { border-color: var(--phosphor-soft); box-shadow: 0 0 12px #34e0a122; }
+.gauge-listen .listen-value {
+  font-size: 13px; color: var(--phosphor);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 .signal {
   width: 8px; height: 8px; border-radius: 50%; background: var(--phosphor); flex: none;

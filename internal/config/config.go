@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -26,8 +27,9 @@ type TLS struct {
 }
 
 type Capture struct {
-	Addr string `yaml:"addr"` // 裸 TCP 抓包监听地址，对外暴露这个端口
-	TLS  TLS    `yaml:"tls"`
+	Addr   string `yaml:"addr"`   // 裸 TCP 抓包监听地址，对外暴露这个端口
+	Domain string `yaml:"domain"` // 抓包端口对外暴露的域名/基址，可含协议前缀（如 https://example.com）；留空则面板回退展示 localhost
+	TLS    TLS    `yaml:"tls"`
 }
 
 type Dashboard struct {
@@ -83,6 +85,27 @@ func Default() *Config {
 		Log:       Log{File: "data/logs/rawlens.log", MaxSizeMB: 10, MaxBackups: 5, MaxAgeDays: 14},
 		Auth:      Auth{Enabled: false, SessionTTLHours: 168},
 	}
+}
+
+// CaptureURL 返回抓包端口对外的完整展示地址，供面板展示与复制。
+//
+//   - 配了 Capture.Domain 时：直接拼成 "<域名>:<端口>"（端口取自 Capture.Addr）。
+//   - 未配 Domain 时：回退成 "http(s)://localhost:<端口>"，开启抓包 TLS 时用 https。
+//
+// 端口从 Capture.Addr（如 ":9100" / "0.0.0.0:9100"）解析；解析失败时端口取空串兜底，不 panic。
+func (c *Config) CaptureURL() string {
+	_, port, err := net.SplitHostPort(c.Capture.Addr)
+	if err != nil {
+		port = ""
+	}
+	if c.Capture.Domain != "" {
+		return c.Capture.Domain + ":" + port
+	}
+	scheme := "http"
+	if c.Capture.TLS.Enabled {
+		scheme = "https"
+	}
+	return scheme + "://localhost:" + port
 }
 
 // Load 从 path 读取配置并覆盖到默认值上。

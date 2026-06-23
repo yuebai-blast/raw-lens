@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { Detail } from '@/types/api'
 import { b64ToBytes, bytesToText } from '@/utils/bytes'
 import { tryParseJSON, highlightTokens } from '@/utils/json'
-import { useCopy } from './useCopy'
+import { useCopy } from '@/composables/useCopy'
 
 const props = defineProps<{ detail: Detail }>()
 const { copied, copy } = useCopy()
