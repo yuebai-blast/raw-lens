@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 )
 
 type summaryDTO struct {
-	ID          int64  `json:"id"`
+	ID          string `json:"id"`
 	Time        string `json:"time"`
 	RemoteAddr  string `json:"remoteAddr"`
 	TLS         bool   `json:"tls"`
@@ -78,12 +77,7 @@ func newHandler(st *store.Store, auth config.Auth) http.Handler {
 	})
 
 	mux.HandleFunc("GET /api/requests/{id}", func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if err != nil {
-			http.Error(w, "bad id", http.StatusBadRequest)
-			return
-		}
-		c := st.Get(id)
+		c := st.Get(r.PathValue("id"))
 		if c == nil {
 			http.NotFound(w, r)
 			return
@@ -101,11 +95,6 @@ func newHandler(st *store.Store, auth config.Auth) http.Handler {
 	})
 
 	mux.HandleFunc("PATCH /api/requests/{id}", func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if err != nil {
-			http.Error(w, "bad id", http.StatusBadRequest)
-			return
-		}
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		var body struct {
 			Name string `json:"name"`
@@ -114,17 +103,12 @@ func newHandler(st *store.Store, auth config.Auth) http.Handler {
 			http.Error(w, "bad body", http.StatusBadRequest)
 			return
 		}
-		st.SetName(id, normalizeName(body.Name))
+		st.SetName(r.PathValue("id"), normalizeName(body.Name))
 		w.WriteHeader(http.StatusNoContent)
 	})
 
 	mux.HandleFunc("DELETE /api/requests/{id}", func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if err != nil {
-			http.Error(w, "bad id", http.StatusBadRequest)
-			return
-		}
-		st.Delete(id)
+		st.Delete(r.PathValue("id"))
 		w.WriteHeader(http.StatusNoContent)
 	})
 

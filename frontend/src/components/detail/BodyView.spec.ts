@@ -5,7 +5,7 @@ import type { Detail } from '@/types/api'
 
 function detailWithBody(body: string): Detail {
   return {
-    id: 1, time: 't', remoteAddr: 'x', tls: false, method: 'POST', target: '/', proto: 'HTTP/1.1', name: '',
+    id: 'aaaaaaaaaaaa', time: 't', remoteAddr: 'x', tls: false, method: 'POST', target: '/', proto: 'HTTP/1.1', name: '',
     headerCount: 0, bodySize: body.length, rawSize: 0, requestLine: 'POST / HTTP/1.1',
     headers: [], rawBase64: '', bodyBase64: btoa(body),
   }

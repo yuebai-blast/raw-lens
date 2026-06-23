@@ -3,7 +3,7 @@ import type { Summary } from '@/types/api'
 import { fmtBytes, meterPct } from '@/utils/bytes'
 
 const props = defineProps<{ item: Summary; active: boolean; isNew: boolean }>()
-const emit = defineEmits<{ select: [id: number]; delete: [id: number] }>()
+const emit = defineEmits<{ select: [id: string]; delete: [id: string] }>()
 
 function time(t: string): string {
   return new Date(t).toLocaleTimeString('en-GB')

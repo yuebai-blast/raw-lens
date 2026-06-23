@@ -15,7 +15,7 @@ onUnmounted(() => store.stopPolling())
 watch(
   () => props.id,
   (id) => {
-    if (id) void store.fetchDetail(Number(id))
+    if (id) void store.fetchDetail(id)
     else {
       store.activeId = null
       store.current = null

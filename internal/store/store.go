@@ -3,7 +3,9 @@
 package store
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"os"
@@ -17,7 +19,7 @@ import (
 // Raw 是连接上读到的原始字节（请求行 + header 块 + body），完全保真。
 // Headers 是按收到的顺序、原始大小写解析出来的，方便前端结构化展示。
 type CapturedRequest struct {
-	ID          int64
+	ID          string // 对外公开标识，12 位随机小写 hex
 	Time        time.Time
 	RemoteAddr  string
 	TLS         bool
@@ -46,9 +48,11 @@ type Store struct {
 // selectCols 统一 SELECT 的列顺序，scanRow 依赖此顺序。
 const selectCols = `id, captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw, name`
 
+// schema 是当前结构：seq 内部自增序号（仅排序/保留策略用），id 对外随机标识。
 const schema = `
 CREATE TABLE IF NOT EXISTS captured_request (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT, -- 请求序号，自增主键
+  seq          INTEGER PRIMARY KEY AUTOINCREMENT, -- 内部序号，仅用于排序与保留策略，不对外
+  id           TEXT    NOT NULL UNIQUE,           -- 对外公开标识，12 位随机小写 hex
   captured_at  TEXT    NOT NULL,                  -- 抓到的时间，RFC3339Nano(UTC) 字符串
   remote_addr  TEXT    NOT NULL,                  -- 客户端来源地址
   tls          INTEGER NOT NULL,                  -- 是否经 TLS：0=明文 1=TLS
@@ -61,7 +65,6 @@ CREATE TABLE IF NOT EXISTS captured_request (
   raw          BLOB    NOT NULL,                  -- 连接上读到的全量原始字节，逐字保真
   name         TEXT    NOT NULL DEFAULT ''        -- 用户给该请求起的备注名，默认空串
 );
-CREATE INDEX IF NOT EXISTS idx_captured_request_id_desc ON captured_request(id DESC);
 `
 
 // New 打开（或创建）库并建表。
@@ -99,13 +102,63 @@ func New(opts Options) (*Store, error) {
 	return &Store{db: db, max: max}, nil
 }
 
-// migrate 对老库做平滑升级：缺 name 列时补上（CREATE TABLE IF NOT EXISTS 不会给已存在的表加列）。
+// migrate 对老库做平滑升级，按代际顺序执行：
+//  1. 缺 name 列则补上（CREATE TABLE IF NOT EXISTS 不会给已存在的表加列）；
+//  2. 缺 seq 列（旧的自增整数 id 结构）则重建为随机 id 结构。
+//
+// 先做 1 再做 2，保证重建时 SELECT 能安全引用 name 列。
 func migrate(db *sql.DB) error {
-	if hasColumn(db, "captured_request", "name") {
-		return nil
+	if !hasColumn(db, "captured_request", "name") {
+		if _, err := db.Exec(`ALTER TABLE captured_request ADD COLUMN name TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
 	}
-	_, err := db.Exec(`ALTER TABLE captured_request ADD COLUMN name TEXT NOT NULL DEFAULT ''`)
-	return err
+	if !hasColumn(db, "captured_request", "seq") {
+		return rebuildWithRandomID(db)
+	}
+	return nil
+}
+
+// rebuildWithRandomID 把旧的「id 自增整数主键」表重建为「seq 自增主键 + id 随机串」结构。
+// 在事务内：建新表 → 按旧 id 顺序灌入（seq 自然续上、时序不变，id 用 SQLite randomblob 现场生成
+// 12 位小写 hex）→ 删旧表 → 改名。旧抓包数据全部保留。
+func rebuildWithRandomID(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmts := []string{
+		`CREATE TABLE captured_request_new (
+		   seq INTEGER PRIMARY KEY AUTOINCREMENT,
+		   id TEXT NOT NULL UNIQUE,
+		   captured_at TEXT NOT NULL, remote_addr TEXT NOT NULL, tls INTEGER NOT NULL,
+		   request_line TEXT NOT NULL, method TEXT, target TEXT, proto TEXT,
+		   headers_json TEXT NOT NULL, body BLOB, raw BLOB NOT NULL,
+		   name TEXT NOT NULL DEFAULT '')`,
+		`INSERT INTO captured_request_new
+		   (id, captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw, name)
+		 SELECT lower(hex(randomblob(6))), captured_at, remote_addr, tls, request_line, method, target, proto,
+		        headers_json, body, raw, name
+		 FROM captured_request ORDER BY id`,
+		`DROP TABLE captured_request`,
+		`ALTER TABLE captured_request_new RENAME TO captured_request`,
+	}
+	for _, s := range stmts {
+		if _, err := tx.Exec(s); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// newID 生成 12 位随机小写 hex（crypto/rand 6 字节）。
+func newID() (string, error) {
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 // hasColumn 查表是否已有某列。
@@ -132,31 +185,40 @@ func dsnFor(path string) string {
 	return path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
 }
 
-// Add 写入一条请求，返回自增 id；出错记日志并返回 0。
-func (s *Store) Add(cr *CapturedRequest) int64 {
+// Add 写入一条请求，返回随机生成的对外 id；出错记日志并返回空串。
+// id 命中 UNIQUE 冲突时重新生成重试（500 条量级几乎不会发生，做几次兜底）。
+func (s *Store) Add(cr *CapturedRequest) string {
 	hj, err := json.Marshal(cr.Headers)
 	if err != nil {
 		log.Printf("store: 序列化 header 失败: %v", err)
-		return 0
+		return ""
 	}
 	tlsInt := 0
 	if cr.TLS {
 		tlsInt = 1
 	}
-	res, err := s.db.Exec(
-		`INSERT INTO captured_request
-		   (captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw, name)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		cr.Time.UTC().Format(time.RFC3339Nano), cr.RemoteAddr, tlsInt,
-		cr.RequestLine, cr.Method, cr.Target, cr.Proto, string(hj), cr.Body, cr.Raw, cr.Name)
-	if err != nil {
-		log.Printf("store: 写入失败: %v", err)
-		return 0
+	var lastErr error
+	for attempt := 0; attempt < 5; attempt++ {
+		id, err := newID()
+		if err != nil {
+			log.Printf("store: 生成 id 失败: %v", err)
+			return ""
+		}
+		_, err = s.db.Exec(
+			`INSERT INTO captured_request
+			   (id, captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw, name)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			id, cr.Time.UTC().Format(time.RFC3339Nano), cr.RemoteAddr, tlsInt,
+			cr.RequestLine, cr.Method, cr.Target, cr.Proto, string(hj), cr.Body, cr.Raw, cr.Name)
+		if err == nil {
+			cr.ID = id
+			s.prune()
+			return id
+		}
+		lastErr = err // 多半是 id 撞 UNIQUE，换一个再试
 	}
-	id, _ := res.LastInsertId()
-	cr.ID = id
-	s.prune()
-	return id
+	log.Printf("store: 写入失败: %v", lastErr)
+	return ""
 }
 
 // prune 按 max 条数保留最新记录，删掉更旧的。
@@ -166,7 +228,7 @@ func (s *Store) prune() {
 	}
 	if _, err := s.db.Exec(
 		`DELETE FROM captured_request
-		 WHERE id <= (SELECT MAX(id) FROM captured_request) - ?`, s.max); err != nil {
+		 WHERE seq <= (SELECT MAX(seq) FROM captured_request) - ?`, s.max); err != nil {
 		log.Printf("store: 保留策略清理失败: %v", err)
 	}
 }
@@ -174,7 +236,7 @@ func (s *Store) prune() {
 // List 返回最近 max 条请求，按旧→新排序。
 func (s *Store) List() []*CapturedRequest {
 	rows, err := s.db.Query(
-		`SELECT `+selectCols+` FROM captured_request ORDER BY id DESC LIMIT ?`, s.max)
+		`SELECT `+selectCols+` FROM captured_request ORDER BY seq DESC LIMIT ?`, s.max)
 	if err != nil {
 		log.Printf("store: 查询失败: %v", err)
 		return nil
@@ -200,12 +262,12 @@ func (s *Store) List() []*CapturedRequest {
 }
 
 // Get 按 id 取一条，不存在返回 nil。
-func (s *Store) Get(id int64) *CapturedRequest {
+func (s *Store) Get(id string) *CapturedRequest {
 	row := s.db.QueryRow(`SELECT `+selectCols+` FROM captured_request WHERE id = ?`, id)
 	cr, err := scanRow(row)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			log.Printf("store: 取 #%d 失败: %v", id, err)
+			log.Printf("store: 取 #%s 失败: %v", id, err)
 		}
 		return nil
 	}
@@ -220,16 +282,16 @@ func (s *Store) Clear() {
 }
 
 // SetName 给指定记录设置备注名；出错记日志。
-func (s *Store) SetName(id int64, name string) {
+func (s *Store) SetName(id string, name string) {
 	if _, err := s.db.Exec(`UPDATE captured_request SET name = ? WHERE id = ?`, name, id); err != nil {
-		log.Printf("store: 设置 #%d 名称失败: %v", id, err)
+		log.Printf("store: 设置 #%s 名称失败: %v", id, err)
 	}
 }
 
 // Delete 删除指定记录；删不存在的 id 不视为错误（幂等）。出错记日志。
-func (s *Store) Delete(id int64) {
+func (s *Store) Delete(id string) {
 	if _, err := s.db.Exec(`DELETE FROM captured_request WHERE id = ?`, id); err != nil {
-		log.Printf("store: 删除 #%d 失败: %v", id, err)
+		log.Printf("store: 删除 #%s 失败: %v", id, err)
 	}
 }
 

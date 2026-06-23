@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { useCaptureStore } from '@/stores/captures'
 import { useAuthStore } from '@/stores/auth'
+import { useConfirmStore } from '@/stores/confirm'
 import { useRouter } from 'vue-router'
 
 const store = useCaptureStore()
 const auth = useAuthStore()
+const confirm = useConfirmStore()
 const router = useRouter()
 
 async function onLogout() {
   await auth.logout()
   void router.push({ name: 'login' })
+}
+
+// 清空前二次确认，避免误清整张抓包列表。
+async function onPurge() {
+  if (await confirm.confirm({ title: '清空全部', message: '确认清空所有抓包记录？此操作不可撤销。' })) {
+    await store.clear()
+  }
 }
 </script>
 
@@ -99,7 +108,7 @@ async function onLogout() {
       <button
         class="btn-clear"
         title="清空所有记录"
-        @click="store.clear()"
+        @click="onPurge"
       >
         PURGE
       </button>
