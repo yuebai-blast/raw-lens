@@ -15,6 +15,7 @@ const lines = computed(() => toHexLines(b64ToBytes(props.detail.rawBase64)))
 <style scoped>
 /* hex dump 显示区 */
 pre.hex {
+  min-height: 0; overflow-y: auto; /* 深色框内部滚动，hint 固定在框外上方 */
   font-family: var(--mono); font-size: 12px; line-height: 1.6; margin: 0;
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
   padding: 16px 18px; overflow-x: auto;

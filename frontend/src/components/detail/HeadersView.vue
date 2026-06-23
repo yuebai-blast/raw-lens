@@ -65,7 +65,9 @@ function copyHeaders() {
 
 <style scoped>
 /* headers 表格 */
-.htable { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
+/* display:block + overflow-y 让表格自身成为滚动容器（hint/COPY 固定在框外上方）；
+   table 默认 display 不能可靠滚动，故改 block。 */
+.htable { display: block; min-height: 0; overflow-y: auto; width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
 .htable tr { border-bottom: 1px solid var(--line-soft); }
 .htable tr.reqline td { color: var(--phosphor); font-weight: 600; padding-top: 4px; }
 .htable td { padding: 8px 12px; vertical-align: top; }

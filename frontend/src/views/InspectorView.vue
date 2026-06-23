@@ -34,9 +34,19 @@ watch(
 
 <style scoped>
 /* ---- 双栏 console 布局 ---- */
-.console { display: grid; grid-template-columns: var(--rail) 1fr; min-height: 0; }
+/* 关键：必须显式给行设 minmax(0, 1fr)，把 console 这一行钉死成「父容器高度」。
+   否则隐式行是 auto，会被长 body 撑高、溢出到 overflow:hidden 的 body 被裁掉，
+   导致 .readout / .log 的 overflow-y:auto 永远不触发（主视图过长被截断、无法滚动）。 */
+.console {
+  display: grid;
+  grid-template-columns: var(--rail) 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
 
 @media (max-width: 760px) {
-  .console { grid-template-columns: 1fr; }
+  /* 窄屏改为上下两行：上 log（自身高度）下 readout（占满剩余、可滚动） */
+  .console { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
 }
 </style>

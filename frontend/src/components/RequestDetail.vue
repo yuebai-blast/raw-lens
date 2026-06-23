@@ -131,12 +131,14 @@ function commitName(e: Event) {
 </template>
 
 <style scoped>
-/* ---- readout 容器 ---- */
-.readout { overflow-y: auto; min-height: 0; position: relative; }
+/* ---- readout 容器 ----
+   纵向 flex：头部（detail-bar）固定不滚，只有内容区 .pane 自己滚动，
+   这样滚动条只落在内容那一块，而不是整个右侧面板从顶到底一根。 */
+.readout { display: flex; flex-direction: column; min-height: 0; position: relative; }
 
 /* ---- 空态等待 ---- */
 .awaiting {
-  height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; gap: 14px; color: var(--muted);
 }
 .awaiting-art { font-size: 30px; color: var(--phosphor); letter-spacing: 10px; opacity: .55; animation: drift 3s ease-in-out infinite; }
@@ -148,7 +150,7 @@ function commitName(e: Event) {
 
 /* ---- 详情头 ---- */
 .detail-bar {
-  position: sticky; top: 0; z-index: 5;
+  flex: none; z-index: 5;
   padding: 16px 24px 0; background: linear-gradient(180deg, var(--bg) 70%, transparent);
   border-bottom: 1px solid var(--line);
   overflow: hidden;
@@ -197,6 +199,7 @@ function commitName(e: Event) {
 .tab:hover { color: var(--ink-dim); }
 .tab.active { color: var(--phosphor); background: var(--panel-2); border-color: var(--line); }
 
-/* ---- 内容区 ---- */
-.pane { padding: 20px 24px 40px; }
+/* ---- 内容区：纵向 flex，自己不滚。
+   hint（含 COPY）固定在上，滚动交给下面的深色内容框（各视图的 pre/table）。 ---- */
+.pane { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 20px 24px 40px; }
 </style>

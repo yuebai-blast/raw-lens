@@ -54,6 +54,7 @@ function copyBody() {
 
 /* 原始字节显示区 */
 pre.wire {
+  min-height: 0; overflow-y: auto; /* 深色框内部滚动，hint/COPY 固定在框外上方 */
   font-family: var(--mono); font-size: 12.5px; line-height: 1.65;
   white-space: pre-wrap; word-break: break-all; margin: 0;
   background:

@@ -39,10 +39,19 @@ body {
   color: var(--ink);
   font-family: var(--sans);
   font-size: 14px;
-  display: grid;
-  grid-template-rows: auto 1fr;
   height: 100vh;
   overflow: hidden;
+}
+
+/* Vue 挂载点：必须由 #app 撑满 body 并接管整体网格（masthead 行 + 主体 1fr 行）。
+   关键：网格不能只写在 body 上——body 唯一的子节点是 #app，masthead/main 都在 #app 里。
+   若 #app 不撑满高度、不下放网格，main.console 的 1fr/minmax 高度链就断在这里，
+   主视图（长 body）会把 #app 撑高、溢出到 overflow:hidden 的 body 被裁掉，无法滚动。 */
+#app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
 }
 
 /* ---- 大气特效层（CRT 扫描线 + 暗角）---- */
@@ -93,6 +102,7 @@ body {
 .hint {
   font-family: var(--mono); font-size: 11px; color: var(--muted);
   margin: 0 0 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  flex: none; /* 作为 .pane 的 flex 子项固定在顶部，不随内容滚动 */
 }
 .copy {
   font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--ink-dim);
