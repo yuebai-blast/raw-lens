@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
-import { useCaptureStore } from '@/stores/captures'
 import Masthead from '@/components/Masthead.vue'
-
-const store = useCaptureStore()
-onMounted(() => store.startPolling())
-onUnmounted(() => store.stopPolling())
+// 轮询生命周期已移交给 InspectorView（真正展示抓包列表的视图），
+// 避免绑死在只挂载一次的 App.vue 上导致登录后不自动刷新。
 </script>
 
 <template>
