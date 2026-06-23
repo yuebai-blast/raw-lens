@@ -22,3 +22,8 @@ export interface Detail extends Summary {
   rawBase64: string
   bodyBase64: string
 }
+
+export interface SessionInfo {
+  enabled: boolean
+  authenticated: boolean
+}

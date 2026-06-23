@@ -78,7 +78,7 @@ func main() {
 	}()
 
 	log.Printf("raw-lens 启动：抓包 %s，面板 http://localhost%s", cfg.Capture.Addr, cfg.Dashboard.Addr)
-	if err := dashboard.Serve(cfg.Dashboard.Addr, st); err != nil {
+	if err := dashboard.Serve(cfg.Dashboard.Addr, st, cfg.Auth); err != nil {
 		log.Fatalf("dashboard server: %v", err)
 	}
 }

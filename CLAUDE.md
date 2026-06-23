@@ -53,3 +53,5 @@ gofmt -l .             # CI 用它判定格式，有输出即失败
 ## 配置
 
 所有运行时配置走 `config.yaml`（`internal/config/config.go`：文件不存在用内置默认值，存在则字段覆盖）。`-config /path/to.yaml` 是唯一的命令行 flag。部署只需二进制 + 一个 yaml。仓库里只提交模板 `config.example.yaml`，实际的 `config.yaml` 由各环境从模板复制而来、已在 `.gitignore` 中不入库（程序默认仍读 `config.yaml`，`config.go` 的 `DefaultPath` 不变）。
+
+面板登录鉴权由 `config.yaml` 的 `auth` 段控制（`enabled`/`username`/`password`/`session_ttl_hours`，默认关闭，零配置启动不变）。实现为内存 Session + httpOnly cookie（`internal/dashboard/auth.go`），中间件白名单式只拦数据 API（`/api/requests*`、`/api/clear`），放行 SPA 外壳与 `/api/login|logout|session`。**不变量：鉴权只作用于面板端口，抓包端口（`:9100`）的代码路径绝不加鉴权。**

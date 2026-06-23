@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yuebai-blast/raw-lens/internal/config"
 	"github.com/yuebai-blast/raw-lens/internal/store"
 	"github.com/yuebai-blast/raw-lens/web"
 )
@@ -56,9 +57,14 @@ func toSummary(c *store.CapturedRequest) summaryDTO {
 	}
 }
 
-// newHandler 组装路由：/api/* 为 JSON API，其余走内嵌前端（SPA fallback）。
-func newHandler(st *store.Store) http.Handler {
+// newHandler 组装路由：先挂鉴权端点，再挂数据 API 与静态层，最后用鉴权中间件包住。
+func newHandler(st *store.Store, auth config.Auth) http.Handler {
 	mux := http.NewServeMux()
+	gate := newAuthGate(auth)
+
+	mux.HandleFunc("POST /api/login", gate.handleLogin)
+	mux.HandleFunc("POST /api/logout", gate.handleLogout)
+	mux.HandleFunc("GET /api/session", gate.handleSession)
 
 	mux.HandleFunc("GET /api/requests", func(w http.ResponseWriter, r *http.Request) {
 		items := st.List()
@@ -99,7 +105,7 @@ func newHandler(st *store.Store) http.Handler {
 
 	// 其余路径交给内嵌前端：命中 dist 中的文件就发文件，否则回退 index.html（支持 /r/:id 刷新）。
 	mux.Handle("GET /", spaFileServer())
-	return mux
+	return gate.middleware(mux)
 }
 
 // spaFileServer 提供内嵌前端的静态资源，未命中文件时回退 index.html（SPA history 模式）。
@@ -133,10 +139,10 @@ func spaFileServer() http.Handler {
 	})
 }
 
-// Serve 在 addr 上提供前端 + API。
-func Serve(addr string, st *store.Store) error {
+// Serve 在 addr 上提供前端 + API，按 auth 配置决定是否启用登录鉴权。
+func Serve(addr string, st *store.Store, auth config.Auth) error {
 	log.Printf("dashboard 监听 %s", addr)
-	return http.ListenAndServe(addr, newHandler(st))
+	return http.ListenAndServe(addr, newHandler(st, auth))
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

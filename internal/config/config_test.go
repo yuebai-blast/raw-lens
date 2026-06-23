@@ -84,3 +84,59 @@ func TestLoadRejectsInvalidMode(t *testing.T) {
 		t.Fatal("非法 mode 应返回错误，却成功了")
 	}
 }
+
+func TestDefaultAuthDisabled(t *testing.T) {
+	cfg := Default()
+	if cfg.Auth.Enabled {
+		t.Fatalf("默认 auth 应关闭")
+	}
+	if cfg.Auth.SessionTTLHours != 168 {
+		t.Fatalf("默认会话有效期应为 168 小时，得到 %d", cfg.Auth.SessionTTLHours)
+	}
+}
+
+func TestLoadAuthEnabledRequiresCredentials(t *testing.T) {
+	dir := t.TempDir()
+	f := dir + "/config.yaml"
+	if err := os.WriteFile(f, []byte("auth:\n  enabled: true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Load(f); err == nil {
+		t.Fatalf("auth.enabled=true 但缺账号密码时应报错")
+	}
+}
+
+func TestLoadAuthEnabledOK(t *testing.T) {
+	dir := t.TempDir()
+	f := dir + "/config.yaml"
+	body := "auth:\n  enabled: true\n  username: admin\n  password: secret\n"
+	if err := os.WriteFile(f, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, err := Load(f)
+	if err != nil {
+		t.Fatalf("合法 auth 配置不应报错: %v", err)
+	}
+	if !cfg.Auth.Enabled || cfg.Auth.Username != "admin" || cfg.Auth.Password != "secret" {
+		t.Fatalf("auth 字段未正确加载: %+v", cfg.Auth)
+	}
+	if cfg.Auth.SessionTTLHours != 168 {
+		t.Fatalf("未配 ttl 应保留默认 168，得到 %d", cfg.Auth.SessionTTLHours)
+	}
+}
+
+func TestLoadAuthTTLFallback(t *testing.T) {
+	dir := t.TempDir()
+	f := dir + "/config.yaml"
+	body := "auth:\n  enabled: true\n  username: a\n  password: b\n  session_ttl_hours: 0\n"
+	if err := os.WriteFile(f, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, err := Load(f)
+	if err != nil {
+		t.Fatalf("Load 失败: %v", err)
+	}
+	if cfg.Auth.SessionTTLHours != 168 {
+		t.Fatalf("ttl<=0 应回落 168，得到 %d", cfg.Auth.SessionTTLHours)
+	}
+}

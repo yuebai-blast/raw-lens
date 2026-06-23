@@ -56,11 +56,21 @@ type Log struct {
 	MaxAgeDays int    `yaml:"max_age_days"` // 备份最多保留多少天
 }
 
+// Auth 控制面板登录鉴权。Enabled=false（默认）时面板免登录，行为同历史版本。
+// Enabled=true 时访问面板数据 API 需先用 Username/Password 登录。密码为明文。
+type Auth struct {
+	Enabled         bool   `yaml:"enabled"`           // true 才开启面板登录鉴权
+	Username        string `yaml:"username"`          // 登录用户名
+	Password        string `yaml:"password"`          // 登录密码（明文）
+	SessionTTLHours int    `yaml:"session_ttl_hours"` // 会话有效期（小时），重启进程后会话清空需重登
+}
+
 type Config struct {
 	Capture   Capture   `yaml:"capture"`
 	Dashboard Dashboard `yaml:"dashboard"`
 	Store     Store     `yaml:"store"`
 	Log       Log       `yaml:"log"`
+	Auth      Auth      `yaml:"auth"`
 }
 
 // Default 返回内置默认配置。
@@ -70,6 +80,7 @@ func Default() *Config {
 		Dashboard: Dashboard{Addr: ":9101"},
 		Store:     Store{Max: 500, Mode: SQLITE},
 		Log:       Log{File: "data/logs/rawlens.log", MaxSizeMB: 10, MaxBackups: 5, MaxAgeDays: 14},
+		Auth:      Auth{Enabled: false, SessionTTLHours: 168},
 	}
 }
 
@@ -108,6 +119,15 @@ func Load(path string) (*Config, bool, error) {
 		}
 		if cfg.Log.MaxAgeDays <= 0 {
 			cfg.Log.MaxAgeDays = 14
+		}
+	}
+	// 开启鉴权时账号密码必填，否则既进不去也拦不住，属配置错误。
+	if cfg.Auth.Enabled {
+		if cfg.Auth.Username == "" || cfg.Auth.Password == "" {
+			return nil, false, fmt.Errorf("auth.enabled 为 true 时必须配置 auth.username 与 auth.password")
+		}
+		if cfg.Auth.SessionTTLHours <= 0 {
+			cfg.Auth.SessionTTLHours = 168
 		}
 	}
 	return cfg, true, nil

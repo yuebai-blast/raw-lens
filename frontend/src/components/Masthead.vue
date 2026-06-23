@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { useCaptureStore } from '@/stores/captures'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+
 const store = useCaptureStore()
+const auth = useAuthStore()
+const router = useRouter()
+
+async function onLogout() {
+  await auth.logout()
+  void router.push({ name: 'login' })
+}
 </script>
 
 <template>
@@ -92,6 +102,14 @@ const store = useCaptureStore()
         @click="store.clear()"
       >
         PURGE
+      </button>
+      <button
+        v-if="auth.enabled && auth.authenticated"
+        class="btn-clear"
+        title="登出"
+        @click="onLogout"
+      >
+        LOGOUT
       </button>
     </div>
   </header>

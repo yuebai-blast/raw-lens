@@ -1,10 +1,17 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useCaptureStore } from './captures'
+import { useAuthStore } from './auth'
 import type { Summary } from '@/types/api'
 
-function mockFetchOnce(json: unknown, ok = true) {
-  return vi.fn().mockResolvedValue({ ok, json: async () => json, status: ok ? 200 : 500 })
+// mock vue-router，避免 router.push 报「no active pinia」类错误
+vi.mock('@/router', () => ({
+  default: { push: vi.fn() },
+}))
+
+function mockFetchOnce(json: unknown, ok = true, status?: number) {
+  const s = status ?? (ok ? 200 : 500)
+  return vi.fn().mockResolvedValue({ ok, json: async () => json, status: s })
 }
 
 const sample: Summary[] = [
@@ -13,6 +20,7 @@ const sample: Summary[] = [
 
 describe('useCaptureStore', () => {
   beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => vi.unstubAllGlobals())
 
   it('refresh 成功后填充 list 且状态为 CAPTURING', async () => {
     vi.stubGlobal('fetch', mockFetchOnce(sample))
@@ -53,6 +61,27 @@ describe('useCaptureStore', () => {
     await s.fetchDetail(1)
     expect(s.current).toBeNull()
     expect(s.activeId).toBe(1)
+  })
+
+  it('fetchDetail 收到 401 时触发未登录处理（authenticated 置 false），而非静默置空', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce(null, false, 401))
+    const s = useCaptureStore()
+    const auth = useAuthStore()
+    auth.authenticated = true // 初始已登录
+    await s.fetchDetail(1)
+    // 401 应触发 handleUnauthorized：authenticated 被置 false
+    expect(auth.authenticated).toBe(false)
+    // current 不应被置空（handleUnauthorized 不改 current，这是与普通 404 的区别）
+    expect(s.current).toBeNull() // 初始值，未被写入
+  })
+
+  it('refresh 收到 401 时触发未登录处理（authenticated 置 false）', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce(null, false, 401))
+    const s = useCaptureStore()
+    const auth = useAuthStore()
+    auth.authenticated = true
+    await s.refresh()
+    expect(auth.authenticated).toBe(false)
   })
 
   it('clear 后 list 与 current 清空', async () => {

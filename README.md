@@ -66,6 +66,24 @@ log:
 
 `-config` 是唯一的命令行 flag。`store.mode` 默认 `SQLITE`，请求落盘到 `data/db/rawlens.db` 持久化、进程重启后记录不丢失；配成 `MEMORY` 则用内存库、重启即清空。日志始终打到 stdout（`docker logs` 可见）；`log.file` 非空时再额外写一份到该文件并用 lumberjack 按大小滚动，配空字符串则只走 stdout。db 与日志都落在 `data/` 子目录下（`data/db`、`data/logs`），本地 dev 与容器一致，不会散落在启动目录根上。
 
+## 面板登录鉴权（可选）
+
+面板默认免登录。需要时在 `config.yaml` 开启：
+
+```yaml
+auth:
+  enabled: true
+  username: admin
+  password: your-password   # 明文
+  session_ttl_hours: 168    # 会话有效期（小时），默认 7 天
+```
+
+- 开启后访问面板需先登录；登录态用 httpOnly cookie 维持。
+- 会话存在内存，**进程重启后需重新登录**。
+- `enabled: true` 却没填 `username`/`password` 会启动报错。
+- 鉴权只作用于面板端口（`:9101`）；抓包端口（`:9100`）不受影响。
+- cookie 未设 `Secure` 标志，面板按内网/本机 HTTP 部署定位；如挂 HTTPS 反代需自行在反代层处理。
+
 ## 抓 HTTPS 原始请求
 
 在 `config.yaml` 里把 `capture.tls.enabled` 设为 `true`。TLS 握手由 raw-lens 终结，握手后读到的是**解密后的明文字节**——和抓 HTTP 一样保真（顺序、大小写、重复 header 全保留）。
