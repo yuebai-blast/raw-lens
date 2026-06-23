@@ -104,6 +104,8 @@ func (a *authGate) authed(r *http.Request) bool {
 }
 
 func (a *authGate) handleLogin(w http.ResponseWriter, r *http.Request) {
+	// 限制请求体大小，防止超大 body 占用内存（登录体仅需几十字节，1 MiB 已极为宽裕）。
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req loginReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONStatus(w, http.StatusBadRequest, map[string]any{"authenticated": false})

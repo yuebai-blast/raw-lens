@@ -42,6 +42,7 @@ async function submit() {
           v-model="username"
           autocomplete="username"
           autofocus
+          required
         >
       </label>
       <label>
@@ -50,6 +51,7 @@ async function submit() {
           v-model="password"
           type="password"
           autocomplete="current-password"
+          required
         >
       </label>
       <p

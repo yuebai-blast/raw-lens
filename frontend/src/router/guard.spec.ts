@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { setupGuard } from './index'
@@ -19,6 +19,7 @@ function makeRouter() {
 
 describe('路由守卫', () => {
   beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => vi.unstubAllGlobals())
 
   it('开启鉴权且未登录时访问 / 跳转 /login', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
