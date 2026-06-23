@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Detail } from '@/types/api'
-import { useCopy } from './useCopy'
+import { useCopy } from '@/composables/useCopy'
 
 const props = defineProps<{ detail: Detail }>()
 const { copied, copy } = useCopy()

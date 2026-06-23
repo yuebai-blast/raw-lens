@@ -59,13 +59,19 @@ func toSummary(c *store.CapturedRequest) summaryDTO {
 }
 
 // newHandler 组装路由：先挂鉴权端点，再挂数据 API 与静态层，最后用鉴权中间件包住。
-func newHandler(st *store.Store, auth config.Auth) http.Handler {
+// captureURL 是抓包端口对外的展示地址，经 GET /api/meta 暴露给前端顶栏展示。
+func newHandler(st *store.Store, auth config.Auth, captureURL string) http.Handler {
 	mux := http.NewServeMux()
 	gate := newAuthGate(auth)
 
 	mux.HandleFunc("POST /api/login", gate.handleLogin)
 	mux.HandleFunc("POST /api/logout", gate.handleLogout)
 	mux.HandleFunc("GET /api/session", gate.handleSession)
+
+	// 面板顶栏元信息：只读、非敏感、未列入 isGated 故鉴权开启时也放行。
+	mux.HandleFunc("GET /api/meta", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]string{"captureUrl": captureURL})
+	})
 
 	mux.HandleFunc("GET /api/requests", func(w http.ResponseWriter, r *http.Request) {
 		items := st.List()
@@ -154,9 +160,10 @@ func spaFileServer() http.Handler {
 }
 
 // Serve 在 addr 上提供前端 + API，按 auth 配置决定是否启用登录鉴权。
-func Serve(addr string, st *store.Store, auth config.Auth) error {
+// captureURL 是抓包端口对外的展示地址，供面板顶栏展示与复制。
+func Serve(addr string, st *store.Store, auth config.Auth, captureURL string) error {
 	log.Printf("dashboard 监听 %s", addr)
-	return http.ListenAndServe(addr, newHandler(st, auth))
+	return http.ListenAndServe(addr, newHandler(st, auth, captureURL))
 }
 
 // normalizeName 去掉名称首尾空白，并截断到 200 个字符（按 rune 计，避免截断多字节字符）。

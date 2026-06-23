@@ -140,3 +140,31 @@ func TestLoadAuthTTLFallback(t *testing.T) {
 		t.Fatalf("ttl<=0 应回落 168，得到 %d", cfg.Auth.SessionTTLHours)
 	}
 }
+
+func TestCaptureURLWithDomain(t *testing.T) {
+	cfg := Default()
+	cfg.Capture.Addr = ":9100"
+	cfg.Capture.Domain = "https://xxx.xx.com"
+	if got := cfg.CaptureURL(); got != "https://xxx.xx.com:9100" {
+		t.Fatalf("配域名应拼成 https://xxx.xx.com:9100，得到 %q", got)
+	}
+}
+
+func TestCaptureURLFallbackHTTP(t *testing.T) {
+	cfg := Default()
+	cfg.Capture.Addr = ":9100"
+	cfg.Capture.Domain = ""
+	if got := cfg.CaptureURL(); got != "http://localhost:9100" {
+		t.Fatalf("未配域名应回退 http://localhost:9100，得到 %q", got)
+	}
+}
+
+func TestCaptureURLFallbackHTTPSWhenTLS(t *testing.T) {
+	cfg := Default()
+	cfg.Capture.Addr = "0.0.0.0:9443"
+	cfg.Capture.Domain = ""
+	cfg.Capture.TLS.Enabled = true
+	if got := cfg.CaptureURL(); got != "https://localhost:9443" {
+		t.Fatalf("开 TLS 未配域名应回退 https://localhost:9443，得到 %q", got)
+	}
+}

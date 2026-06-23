@@ -65,7 +65,7 @@ func enabledHandler(t *testing.T) http.Handler {
 	t.Helper()
 	return newHandler(newTestStore(t), config.Auth{
 		Enabled: true, Username: "admin", Password: "secret", SessionTTLHours: 168,
-	})
+	}, "")
 }
 
 func TestLoginSuccessSetsCookie(t *testing.T) {
@@ -156,7 +156,7 @@ func TestSessionEndpointReports(t *testing.T) {
 }
 
 func TestDisabledAuthAllowsEverything(t *testing.T) {
-	h := newHandler(newTestStore(t), config.Auth{Enabled: false})
+	h := newHandler(newTestStore(t), config.Auth{Enabled: false}, "")
 	req := httptest.NewRequest(http.MethodGet, "/api/requests", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -210,7 +210,7 @@ func TestLoginCookieSecureOn(t *testing.T) {
 	// CookieSecure=true（公网 HTTPS 反代场景）：cookie 必须带 Secure。
 	h := newHandler(newTestStore(t), config.Auth{
 		Enabled: true, Username: "admin", Password: "secret", SessionTTLHours: 168, CookieSecure: true,
-	})
+	}, "")
 	if c := login(t, h); !c.Secure {
 		t.Fatalf("CookieSecure=true 时 cookie 应带 Secure")
 	}

@@ -36,7 +36,7 @@ func newTestStore(t *testing.T) *store.Store {
 
 // /api/* 不被静态层拦截：未知 id 应由 API handler 返回 404，而非回退 index.html。
 func TestAPIRouteNotSwallowedBySPAFallback(t *testing.T) {
-	h := newHandler(newTestStore(t), config.Auth{})
+	h := newHandler(newTestStore(t), config.Auth{}, "")
 	req := httptest.NewRequest(http.MethodGet, "/api/requests/999999", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -50,7 +50,7 @@ func TestAPIRouteNotSwallowedBySPAFallback(t *testing.T) {
 
 // 未构建前端（dist 仅占位）时，非 API 路径应给出可读提示而非 panic / 500 空响应。
 func TestSPAFallbackWhenFrontendNotBuilt(t *testing.T) {
-	h := newHandler(newTestStore(t), config.Auth{})
+	h := newHandler(newTestStore(t), config.Auth{}, "")
 	for _, path := range []string{"/", "/r/123"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
@@ -66,7 +66,7 @@ func TestSPAFallbackWhenFrontendNotBuilt(t *testing.T) {
 
 // /api/requests 正常返回 JSON 数组。
 func TestAPIRequestsStillJSON(t *testing.T) {
-	h := newHandler(newTestStore(t), config.Auth{})
+	h := newHandler(newTestStore(t), config.Auth{}, "")
 	req := httptest.NewRequest(http.MethodGet, "/api/requests", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -81,7 +81,7 @@ func TestAPIRequestsStillJSON(t *testing.T) {
 // PATCH /api/requests/{id} 设置名称：204，且后续 GET 详情/列表能读回。
 func TestPatchSetsName(t *testing.T) {
 	st := newTestStore(t)
-	h := newHandler(st, config.Auth{})
+	h := newHandler(st, config.Auth{}, "")
 	id := seedReq(st)
 
 	req := httptest.NewRequest(http.MethodPatch, "/api/requests/"+id, strings.NewReader(`{"name":"  登录接口  "}`))
@@ -105,7 +105,7 @@ func TestPatchSetsName(t *testing.T) {
 
 // PATCH 未知 id：id 现在是随机串，任意非空形状都合法，查不到即无操作返回 204。
 func TestPatchUnknownID(t *testing.T) {
-	h := newHandler(newTestStore(t), config.Auth{})
+	h := newHandler(newTestStore(t), config.Auth{}, "")
 	req := httptest.NewRequest(http.MethodPatch, "/api/requests/deadbeef0000", strings.NewReader(`{"name":"x"}`))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -116,7 +116,7 @@ func TestPatchUnknownID(t *testing.T) {
 
 // GET 未知 id 仍返回 404。
 func TestGetUnknownID(t *testing.T) {
-	h := newHandler(newTestStore(t), config.Auth{})
+	h := newHandler(newTestStore(t), config.Auth{}, "")
 	req := httptest.NewRequest(http.MethodGet, "/api/requests/deadbeef0000", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -128,7 +128,7 @@ func TestGetUnknownID(t *testing.T) {
 // DELETE /api/requests/{id} 删除单条：204，且后续取不到、列表少一条。
 func TestDeleteRemovesOne(t *testing.T) {
 	st := newTestStore(t)
-	h := newHandler(st, config.Auth{})
+	h := newHandler(st, config.Auth{}, "")
 	id1 := seedReq(st)
 	seedReq(st)
 
@@ -170,4 +170,21 @@ func getJSONArray(t *testing.T, h http.Handler, path string) []map[string]any {
 		t.Fatalf("解析 %s 响应失败: %v (body=%s)", path, err, rec.Body.String())
 	}
 	return a
+}
+
+// GET /api/meta 返回注入的抓包展示地址，且鉴权开启时也放行（不在 isGated 列表内）。
+func TestMetaReturnsCaptureURL(t *testing.T) {
+	h := newHandler(newTestStore(t), config.Auth{
+		Enabled: true, Username: "admin", Password: "secret", SessionTTLHours: 168,
+	}, "https://xxx.xx.com:9100")
+	req := httptest.NewRequest(http.MethodGet, "/api/meta", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/api/meta 期望 200（应放行），得到 %d", rec.Code)
+	}
+	m := getJSON(t, h, "/api/meta")
+	if m["captureUrl"] != "https://xxx.xx.com:9100" {
+		t.Fatalf("captureUrl 期望 https://xxx.xx.com:9100，得到 %v", m["captureUrl"])
+	}
 }

@@ -5,6 +5,10 @@
 capture:
   # 裸 TCP 抓包监听地址 —— 对外暴露这个端口，客户端把请求发到这里
   addr: ":9100"
+  # 抓包端口对外暴露的域名/基址（可含协议，如 https://example.com）；
+  # 面板会在其后自动拼上抓包端口展示成完整地址（如 https://example.com:9100），可点击复制。
+  # 留空则面板回退展示 http(s)://localhost:<端口>。
+  domain: ""
   tls:
     enabled: false   # 开启后抓包端口走 TLS，可抓 HTTPS 的原始请求
     cert: ""         # 证书文件路径；留空则用内存自签名证书（客户端需 curl -k）
