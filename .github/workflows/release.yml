@@ -1,4 +1,4 @@
-name: Image
+name: Release
 
 on:
   push:
@@ -10,9 +10,9 @@ permissions:
   contents: read
   packages: write # 推送到 GHCR 所需
 
-# 串行、禁止取消，避免两次 tag 同时推镜像互相覆盖
+# 串行、禁止取消，避免两次 tag 同时发版（推镜像 + 发 Release）互相覆盖
 concurrency:
-  group: image
+  group: release
   cancel-in-progress: false
 
 env:

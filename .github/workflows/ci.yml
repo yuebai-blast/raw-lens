@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # 质量门禁（后端 + 前端）抽到可复用 workflow，与 image.yml 发版前门禁共用同一份定义
+  # 质量门禁（后端 + 前端）抽到可复用 workflow，与 release.yml 发版前门禁共用同一份定义
   quality:
     uses: ./.github/workflows/quality.yml
 

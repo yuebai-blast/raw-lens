@@ -38,14 +38,14 @@ description = "docker compose 停止并移除 rawlens"
 run = "docker compose down"
 
 # 发版：本项目版本号纯由 git tag 承载（无版本号文件可改），故只需打 tag + 推送。
-# 推送 v*.*.* tag 触发 .github/workflows/image.yml 构建并推镜像到 GHCR。
+# 推送 v*.*.* tag 触发 .github/workflows/release.yml 构建并推镜像到 GHCR、发 GitHub Release。
 # 用法（参数按是否像 vX.Y.Z 自动消歧）：
 #   mise run release                     # 省略版本号 → 取最新稳定 tag 的 patch+1（v0.3.33 → v0.3.34）
 #   mise run release "更新说明"           # patch+1 且带说明（单参数不像版本号即视为说明）
 #   mise run release v0.4.0              # 显式指定版本号（升 minor/major、或预发布时用）
 #   mise run release v0.4.0 "更新说明"    # 指定版本号 + 说明 → annotated tag（注释可被 Release 流程置顶）
 [tasks.release]
-description = "发版：打 vX.Y.Z tag 并推送，触发 Image 工作流（参数：[版本号] [更新说明]，均可省略，省略版本号则 patch+1）"
+description = "发版：打 vX.Y.Z tag 并推送，触发 Release 工作流（参数：[版本号] [更新说明]，均可省略，省略版本号则 patch+1）"
 usage = '''
 arg "[arg1]" help="版本号(vX.Y.Z) 或 更新说明；只传一个时按是否像版本号自动判断"
 arg "[arg2]" help="更新说明（当 arg1 为版本号时）"
@@ -128,9 +128,9 @@ else
   git tag "${ver}"
 fi
 
-# 先推 main 上的提交，再推 tag 触发 Image 工作流
+# 先推 main 上的提交，再推 tag 触发 Release 工作流
 git push origin main
 git push origin "${ver}"
 
-echo "✓ 已发版 ${ver}，Image 工作流将构建镜像并推送到 GHCR。"
+echo "✓ 已发版 ${ver}，Release 工作流将构建镜像、推送到 GHCR 并发 GitHub Release。"
 '''
