@@ -10,7 +10,7 @@ on:
     # 新增顶层 workflow 时记得往这里补一行（GitHub 不支持通配符监听全部）。
     workflows:
       - CI
-      - Image
+      - Release
     types: [completed]
 
 permissions:
