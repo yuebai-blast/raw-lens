@@ -2,6 +2,7 @@
 package dashboard
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"io/fs"
@@ -71,6 +72,18 @@ func newHandler(st *store.Store, auth config.Auth, captureURL string) http.Handl
 	// 面板顶栏元信息：只读、非敏感、未列入 isGated 故鉴权开启时也放行。
 	mux.HandleFunc("GET /api/meta", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"captureUrl": captureURL})
+	})
+
+	// 健康检查：探底层 SQLite 是否可用，供 docker/编排层判断容器是否真正就绪。
+	// 未列入 isGated，故鉴权开启时也放行（探活无需登录凭证）；只能在面板端口、不在抓包端口。
+	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := st.Ping(ctx); err != nil {
+			writeJSONStatus(w, http.StatusServiceUnavailable, map[string]string{"status": "down"})
+			return
+		}
+		writeJSON(w, map[string]string{"status": "ok"})
 	})
 
 	mux.HandleFunc("GET /api/requests", func(w http.ResponseWriter, r *http.Request) {

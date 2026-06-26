@@ -3,6 +3,7 @@
 package store
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -298,6 +299,11 @@ func (s *Store) Delete(id string) {
 // Close 关闭底层数据库。
 func (s *Store) Close() error {
 	return s.db.Close()
+}
+
+// Ping 校验底层数据库连接是否可用，供健康检查端点判断后端是否真正就绪。
+func (s *Store) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
 }
 
 // scanner 同时被 *sql.Row 与 *sql.Rows 满足。

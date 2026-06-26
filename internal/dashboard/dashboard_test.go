@@ -64,6 +64,51 @@ func TestSPAFallbackWhenFrontendNotBuilt(t *testing.T) {
 	}
 }
 
+// GET /api/health 在 store 正常时返回 200 + {"status":"ok"}。
+func TestHealthOK(t *testing.T) {
+	h := newHandler(newTestStore(t), config.Auth{}, "")
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("健康检查期望 200，得到 %d", rec.Code)
+	}
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("响应体非 JSON: %v", err)
+	}
+	if body["status"] != "ok" {
+		t.Fatalf("status 期望 ok，得到 %q", body["status"])
+	}
+}
+
+// 健康检查不受鉴权拦截：开启鉴权且未登录时仍应放行返回 200（供 docker healthcheck 无凭证探活）。
+func TestHealthNotGatedByAuth(t *testing.T) {
+	h := enabledHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("开启鉴权时健康检查仍应放行 200，得到 %d", rec.Code)
+	}
+}
+
+// store 关闭（底层 db 不可用）时健康检查返回 503，反映后端真实不可用。
+func TestHealthDownWhenStoreClosed(t *testing.T) {
+	st, err := store.New(store.Options{Path: ":memory:", Max: 100})
+	if err != nil {
+		t.Fatalf("建 store 失败: %v", err)
+	}
+	h := newHandler(st, config.Auth{}, "")
+	_ = st.Close() // 关闭后底层连接 ping 失败
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("store 不可用时健康检查期望 503，得到 %d", rec.Code)
+	}
+}
+
 // /api/requests 正常返回 JSON 数组。
 func TestAPIRequestsStillJSON(t *testing.T) {
 	h := newHandler(newTestStore(t), config.Auth{}, "")

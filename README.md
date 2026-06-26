@@ -115,7 +115,7 @@ curl -k https://localhost:9100/secure -d hi    # -k 跳过自签名校验
 
 ## 部署
 
-本项目**只支持 Docker 部署**。镜像发布在 GHCR：`ghcr.io/yuebai-blast/raw-lens`（推送 `vX.Y.Z` tag 时由 CI 构建 `linux/amd64,linux/arm64` 多架构镜像）。
+本项目**只支持 Docker 部署**。镜像发布在 GHCR：`ghcr.io/yuebai-blast/raw-lens`（推送 `vX.Y.Z` tag 时由 CI 构建 `linux/amd64` 单架构镜像）。
 
 **推荐用仓库自带的 `docker-compose.yml`**（面板端口绑本机回环，配置与数据都落在 compose 同目录的 bind mount，便于备份/迁移）。把 compose 放进一个专属目录后，在该目录执行：
 
@@ -149,6 +149,8 @@ docker run --rm \
 - 镜像以 **root** 运行（普通 `debian-slim` 底座），能直接写 bind 挂载进来的 `./data`，**无需 chown、无需指定 `user`**。代价：`./data` 下生成的文件在宿主上归 root，删除/编辑可能要 `sudo`。
 - 默认无 `config.yaml` 时使用内置默认值。
 - 抓包端口 9100 对外放开给客户端；面板端口 9101 建议只在本机/内网访问（如用 SSH 隧道 `ssh -L 9101:localhost:9101 user@server`，或只把 9100 映射到宿主公网）。
+- compose 的镜像版本与对外宿主端口都可用环境变量覆盖，不必改文件：`RAWLENS_TAG`（镜像版本，默认 `latest`）、`RAWLENS_CAPTURE_PORT`（抓包端口，默认 `9100`）、`RAWLENS_PANEL_PORT`（面板端口，默认 `9101`，仅绑回环）。例：`RAWLENS_TAG=v1.2.0 RAWLENS_CAPTURE_PORT=8080 docker compose up -d`。
+- 健康检查：compose 内置 `healthcheck`，探面板端口的 `GET /api/health`（内部 ping SQLite，反映后端真实健康），`docker compose ps` 可看 `healthy` 状态。
 - 查看日志：`docker compose logs -f rawlens`（stdout）；长期历史看 `./data/logs/` 下的文件。
 - 本地构建验证：`mise run image`（构建单架构 `rawlens:local`）。
 

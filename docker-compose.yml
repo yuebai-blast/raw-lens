@@ -19,6 +19,11 @@
 #
 # 启动后：客户端把请求发到 9100；浏览器开 http://127.0.0.1:9101 看面板。
 # 改了 config.yaml 里的端口，记得同步下面的 ports 映射。
+#
+# 端口与镜像版本均已参数化（用环境变量覆盖，不必改本文件）：
+#   RAWLENS_TAG          镜像版本（默认 latest）
+#   RAWLENS_CAPTURE_PORT 抓包端口对外宿主端口（默认 9100）
+#   RAWLENS_PANEL_PORT   面板端口对外宿主端口（默认 9101，仅绑回环）
 
 services:
   rawlens:
@@ -26,15 +31,23 @@ services:
     container_name: rawlens
     restart: unless-stopped
     ports:
-      # 抓包端口：对外暴露，客户端把请求打到这里
-      - "9100:9100"
+      # 抓包端口：对外暴露，客户端把请求打到这里（宿主端口参数化，容器端口固定 9100）
+      - "${RAWLENS_CAPTURE_PORT:-9100}:9100"
       # 面板端口：仅绑定本机回环，避免面板对公网开放（建议只在内网/本机访问）
-      - "127.0.0.1:9101:9101"
+      - "127.0.0.1:${RAWLENS_PANEL_PORT:-9101}:9101"
     volumes:
       # 配置文件：宿主 ./config.yaml 只读挂到容器 WORKDIR 下的 /app/config.yaml（默认读取位置）
       - ./config.yaml:/app/config.yaml:ro
       # 数据目录：宿主 ./data 挂到 /app/data，db 与日志都落这里，与 compose 同目录便于备份
       - ./data:/app/data
+    # 健康检查：探面板端口 9101 的 /api/health（专用探活端点，内部 ping SQLite，反映后端真实健康；
+    # 不可用时返回 503）。绝不能探抓包端口 9100，否则探活请求会污染抓包列表；该端点是鉴权白名单，开鉴权也放行。
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9101/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     # 限制 Docker 自身抓取的 stdout 日志大小，避免写满磁盘（文件日志另由程序按 lumberjack 滚动）
     logging:
       driver: json-file

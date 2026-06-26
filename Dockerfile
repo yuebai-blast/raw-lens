@@ -35,6 +35,10 @@ RUN pnpm -C frontend build \
 # 用普通镜像而非 distroless 非 root：以 root 跑，直接可写 bind 挂载进来的目录，
 # 部署时无需 chown 宿主目录、也无需在 compose 里指定 user。构建期的 mise/工具链不进这一层。
 FROM debian:13-slim AS runtime
+# 装 wget 供 docker-compose 的 healthcheck 探活面板端口（slim 底座默认不带 HTTP 客户端）
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends wget \
+ && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/rawlens /usr/local/bin/rawlens
 # WORKDIR=/app：默认读 /app/config.yaml，db 落 /app/data/db、日志落 /app/data/logs
 # （部署时把宿主 ./config.yaml、./data 分别挂到 /app/config.yaml、/app/data）。

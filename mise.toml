@@ -28,3 +28,11 @@ run = ["pnpm -C frontend typecheck", "pnpm -C frontend lint", "pnpm -C frontend 
 [tasks.image]
 description = "本地构建 Docker 镜像（单架构，验证 Dockerfile）"
 run = "docker build -t rawlens:local ."
+
+[tasks.up]
+description = "docker compose 后台启动 rawlens"
+run = "docker compose up -d"
+
+[tasks.down]
+description = "docker compose 停止并移除 rawlens"
+run = "docker compose down"
