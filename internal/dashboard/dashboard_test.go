@@ -217,6 +217,64 @@ func getJSONArray(t *testing.T, h http.Handler, path string) []map[string]any {
 	return a
 }
 
+// PATCH {locked:true} 切锁：204，且 GET 回来的 DTO locked 为 true。
+func TestPatchLocked(t *testing.T) {
+	st := newTestStore(t)
+	h := newHandler(st, config.Auth{}, "")
+	id := seedReq(st)
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/requests/"+id, strings.NewReader(`{"locked":true}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("PATCH locked 期望 204，得到 %d", rec.Code)
+	}
+	d := getJSON(t, h, "/api/requests/"+id)
+	if d["locked"] != true {
+		t.Errorf("PATCH 后 locked 应为 true，得到 %v", d["locked"])
+	}
+}
+
+// PATCH {name:...} 不应误改 locked（指针字段，未提供的不动）。
+func TestPatchNameDoesNotResetLocked(t *testing.T) {
+	st := newTestStore(t)
+	h := newHandler(st, config.Auth{}, "")
+	id := seedReq(st)
+	st.SetLocked(id, true)
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/requests/"+id, strings.NewReader(`{"name":"接口A"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("PATCH name 期望 204，得到 %d", rec.Code)
+	}
+	d := getJSON(t, h, "/api/requests/"+id)
+	if d["locked"] != true {
+		t.Errorf("只改 name 不应动 locked，得到 %v", d["locked"])
+	}
+	if d["name"] != "接口A" {
+		t.Errorf("name 应被更新为 接口A，得到 %v", d["name"])
+	}
+}
+
+// DELETE 锁定记录应被拒绝（409），记录仍在。
+func TestDeleteRejectsLocked(t *testing.T) {
+	st := newTestStore(t)
+	h := newHandler(st, config.Auth{}, "")
+	id := seedReq(st)
+	st.SetLocked(id, true)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/requests/"+id, nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("删除锁定记录期望 409，得到 %d", rec.Code)
+	}
+	if list := getJSONArray(t, h, "/api/requests"); len(list) != 1 {
+		t.Errorf("锁定记录应仍在，列表应剩 1 条，得到 %d", len(list))
+	}
+}
+
 // GET /api/meta 返回注入的抓包展示地址，且鉴权开启时也放行（不在 isGated 列表内）。
 func TestMetaReturnsCaptureURL(t *testing.T) {
 	h := newHandler(newTestStore(t), config.Auth{

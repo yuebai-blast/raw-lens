@@ -25,6 +25,7 @@ type summaryDTO struct {
 	Target      string `json:"target"`
 	Proto       string `json:"proto"`
 	Name        string `json:"name"`
+	Locked      bool   `json:"locked"`
 	HeaderCount int    `json:"headerCount"`
 	BodySize    int    `json:"bodySize"`
 	RawSize     int    `json:"rawSize"`
@@ -53,6 +54,7 @@ func toSummary(c *store.CapturedRequest) summaryDTO {
 		Target:      c.Target,
 		Proto:       c.Proto,
 		Name:        c.Name,
+		Locked:      c.Locked,
 		HeaderCount: len(c.Headers),
 		BodySize:    len(c.Body),
 		RawSize:     len(c.Raw),
@@ -116,18 +118,30 @@ func newHandler(st *store.Store, auth config.Auth, captureURL string) http.Handl
 	mux.HandleFunc("PATCH /api/requests/{id}", func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		var body struct {
-			Name string `json:"name"`
+			Name   *string `json:"name"`
+			Locked *bool   `json:"locked"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			http.Error(w, "bad body", http.StatusBadRequest)
 			return
 		}
-		st.SetName(r.PathValue("id"), normalizeName(body.Name))
+		id := r.PathValue("id")
+		if body.Name != nil {
+			st.SetName(id, normalizeName(*body.Name))
+		}
+		if body.Locked != nil {
+			st.SetLocked(id, *body.Locked)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	})
 
 	mux.HandleFunc("DELETE /api/requests/{id}", func(w http.ResponseWriter, r *http.Request) {
-		st.Delete(r.PathValue("id"))
+		id := r.PathValue("id")
+		if c := st.Get(id); c != nil && c.Locked {
+			http.Error(w, "record is locked", http.StatusConflict)
+			return
+		}
+		st.Delete(id)
 		w.WriteHeader(http.StatusNoContent)
 	})
 
