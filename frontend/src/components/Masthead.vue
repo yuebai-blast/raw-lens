@@ -20,7 +20,7 @@ async function onLogout() {
 
 // 清空前二次确认，避免误清整张抓包列表。
 async function onPurge() {
-  if (await confirm.confirm({ title: '清空全部', message: '确认清空所有抓包记录？此操作不可撤销。' })) {
+  if (await confirm.confirm({ title: '清空全部', message: '确认清空所有抓包记录？已钉住（锁定）的记录会保留，其余不可撤销。' })) {
     await store.clear()
   }
 }
