@@ -39,22 +39,33 @@ run = "docker compose down"
 
 # 发版：本项目版本号纯由 git tag 承载（无版本号文件可改），故只需打 tag + 推送。
 # 推送 v*.*.* tag 触发 .github/workflows/image.yml 构建并推镜像到 GHCR。
-# 用法：
+# 用法（参数按是否像 vX.Y.Z 自动消歧）：
 #   mise run release                     # 省略版本号 → 取最新稳定 tag 的 patch+1（v0.3.33 → v0.3.34）
+#   mise run release "更新说明"           # patch+1 且带说明（单参数不像版本号即视为说明）
 #   mise run release v0.4.0              # 显式指定版本号（升 minor/major、或预发布时用）
-#   mise run release v0.4.0 "更新说明"    # 带说明 → annotated tag（注释可被 Release 流程置顶）
+#   mise run release v0.4.0 "更新说明"    # 指定版本号 + 说明 → annotated tag（注释可被 Release 流程置顶）
 [tasks.release]
-description = "发版：打 vX.Y.Z tag 并推送，触发 Image 工作流（参数：[版本号] [更新说明]，省略版本号则 patch+1）"
+description = "发版：打 vX.Y.Z tag 并推送，触发 Image 工作流（参数：[版本号] [更新说明]，均可省略，省略版本号则 patch+1）"
 usage = '''
-arg "[version]" help="版本号，形如 v0.2.0；省略则取最新稳定 tag 的 patch+1"
-arg "[notes]" help="本次更新说明（可选，写入 annotated tag 注释）"
+arg "[arg1]" help="版本号(vX.Y.Z) 或 更新说明；只传一个时按是否像版本号自动判断"
+arg "[arg2]" help="更新说明（当 arg1 为版本号时）"
 '''
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 
-ver="${usage_version:-}"
-notes="${usage_notes:-}"
+a1="${usage_arg1:-}"
+a2="${usage_arg2:-}"
+
+# 参数消歧：版本号长得像 v?X.Y.Z（可带预发布后缀），其余文本一律当更新说明。
+is_ver() { printf '%s' "$1" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; }
+ver=""
+notes=""
+if [ -n "${a2}" ]; then
+  ver="${a1}"; notes="${a2}"                                   # 传两个：版本号 + 说明
+elif [ -n "${a1}" ]; then
+  if is_ver "${a1}"; then ver="${a1}"; else notes="${a1}"; fi  # 只传一个：自动判断
+fi
 
 # 先抓取远程最新 tag 与 main，供「自动算版本号」和「main 落后检查」共用
 git fetch origin main --tags --quiet
