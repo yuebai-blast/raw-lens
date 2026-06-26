@@ -5,7 +5,7 @@ import type { Summary } from '@/types/api'
 
 const item: Summary = {
   id: 'abc123def456', time: '2026-06-19T01:02:03Z', remoteAddr: 'x', tls: true,
-  method: 'POST', target: '/submit', proto: 'HTTP/1.1', name: '', headerCount: 3, bodySize: 0, rawSize: 2048,
+  method: 'POST', target: '/submit', proto: 'HTTP/1.1', name: '', locked: false, headerCount: 3, bodySize: 0, rawSize: 2048,
 }
 
 describe('LogItem', () => {

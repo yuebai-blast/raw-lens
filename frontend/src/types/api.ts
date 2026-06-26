@@ -7,6 +7,7 @@ export interface Summary {
   target: string
   proto: string
   name: string
+  locked: boolean
   headerCount: number
   bodySize: number
   rawSize: number
