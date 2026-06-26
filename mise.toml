@@ -39,23 +39,45 @@ run = "docker compose down"
 
 # 发版：本项目版本号纯由 git tag 承载（无版本号文件可改），故只需打 tag + 推送。
 # 推送 v*.*.* tag 触发 .github/workflows/image.yml 构建并推镜像到 GHCR。
-# 用法：mise run release v0.2.0 "本次更新说明"   # 说明可省略
-#   有说明 → annotated tag（注释会被 Release 流程置顶到正文）；无说明 → 轻量 tag。
+# 用法：
+#   mise run release                     # 省略版本号 → 取最新稳定 tag 的 patch+1（v0.3.33 → v0.3.34）
+#   mise run release v0.4.0              # 显式指定版本号（升 minor/major、或预发布时用）
+#   mise run release v0.4.0 "更新说明"    # 带说明 → annotated tag（注释可被 Release 流程置顶）
 [tasks.release]
-description = "发版：打 vX.Y.Z tag 并推送，触发 Image 工作流（参数：版本号 [更新说明]）"
+description = "发版：打 vX.Y.Z tag 并推送，触发 Image 工作流（参数：[版本号] [更新说明]，省略版本号则 patch+1）"
 usage = '''
-arg "<version>" help="版本号，形如 v0.2.0 或 0.2.0（统一补 v 前缀）"
+arg "[version]" help="版本号，形如 v0.2.0；省略则取最新稳定 tag 的 patch+1"
 arg "[notes]" help="本次更新说明（可选，写入 annotated tag 注释）"
 '''
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 
-ver="${usage_version}"
+ver="${usage_version:-}"
 notes="${usage_notes:-}"
 
-# 允许传 0.2.0 或 v0.2.0，统一成带 v 前缀
-ver="v${ver#v}"
+# 先抓取远程最新 tag 与 main，供「自动算版本号」和「main 落后检查」共用
+git fetch origin main --tags --quiet
+
+if [ -z "${ver}" ]; then
+  # 未指定版本号：取最新的稳定 tag（vX.Y.Z，排除预发布）做 patch+1。
+  # 用 git 内置版本排序 --sort=-v:refname（不依赖 macOS 不支持 -V 的系统 sort）。
+  latest="$(git tag -l --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
+  if [ -z "${latest}" ]; then
+    echo "✗ 没有可递增的历史 tag，请显式传版本号（如 mise run release v0.1.0）。" >&2
+    exit 1
+  fi
+  base="${latest#v}"            # 去掉 v 前缀：0.3.33
+  major="${base%%.*}"          # 0
+  rest="${base#*.}"            # 3.33
+  minor="${rest%%.*}"          # 3
+  patch="${rest##*.}"          # 33
+  ver="v${major}.${minor}.$((patch + 1))"
+  echo "→ 未指定版本号，基于最新 tag ${latest} 自动递增为 ${ver}"
+else
+  # 允许传 0.2.0 或 v0.2.0，统一成带 v 前缀
+  ver="v${ver#v}"
+fi
 
 # 校验形如 vX.Y.Z（可带预发布后缀，如 -rc.1）
 if ! printf '%s' "$ver" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
@@ -83,7 +105,6 @@ if git rev-parse -q --verify "refs/tags/${ver}" >/dev/null; then
 fi
 
 # 确保本地 main 不落后于远程，避免基于过期 main 打 tag
-git fetch origin main --tags --quiet
 if [ -n "$(git rev-list "HEAD..origin/main" 2>/dev/null)" ]; then
   echo "✗ 本地 main 落后于 origin/main，请先 git pull。" >&2
   exit 1
