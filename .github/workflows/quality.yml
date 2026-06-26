@@ -1,6 +1,6 @@
 name: Quality
 
-# 可复用的质量门禁：后端 + 前端检查。供 ci.yml（PR/push）与 image.yml（发版前）共同调用，
+# 可复用的质量门禁：后端 + 前端检查。供 ci.yml（PR/push）与 release.yml（发版前）共同调用，
 # 保证「合并前校验」和「发版前校验」用同一份定义，永不漂移。
 on:
   workflow_call:
