@@ -107,9 +107,10 @@ func New(opts Options) (*Store, error) {
 
 // migrate 对老库做平滑升级，按代际顺序执行：
 //  1. 缺 name 列则补上（CREATE TABLE IF NOT EXISTS 不会给已存在的表加列）；
-//  2. 缺 seq 列（旧的自增整数 id 结构）则重建为随机 id 结构。
+//  2. 缺 seq 列（旧的自增整数 id 结构）则重建为随机 id 结构（重建出的新表已含 locked 列）；
+//  3. 缺 locked 列则 ALTER 补上（已有 seq 结构但在 locked 列加入前创建的库）。
 //
-// 先做 1 再做 2，保证重建时 SELECT 能安全引用 name 列。
+// 先做 1 再做 2，保证重建时 SELECT 能安全引用 name 列；第 3 步只在 seq 已存在时才执行。
 func migrate(db *sql.DB) error {
 	if !hasColumn(db, "captured_request", "name") {
 		if _, err := db.Exec(`ALTER TABLE captured_request ADD COLUMN name TEXT NOT NULL DEFAULT ''`); err != nil {

@@ -30,6 +30,7 @@ function time(t: string): string {
       >{{ props.item.method || '?' }}</span>
       <span class="item-target">{{ props.item.target || '/' }}</span>
       <button
+        type="button"
         class="item-pin"
         :class="{ pinned: props.item.locked }"
         :title="props.item.locked ? '取消钉住（解锁）' : '钉住（锁定，防删除/清空）'"

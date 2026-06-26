@@ -36,6 +36,7 @@ async function toggleLock(id: string) {
     <div class="log-head">
       <span>SIGNAL LOG</span>
       <button
+        type="button"
         class="filter-lock"
         :class="{ on: store.showLockedOnly }"
         :title="store.showLockedOnly ? '显示全部记录' : '只看钉住的记录'"

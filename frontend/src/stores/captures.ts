@@ -149,9 +149,13 @@ export const useCaptureStore = defineStore('captures', {
       }
     },
     async clear() {
-      const res = await fetch('/api/clear', { method: 'POST' })
-      if (res.status === 401) {
-        this.handleUnauthorized()
+      try {
+        const res = await fetch('/api/clear', { method: 'POST' })
+        if (res.status === 401) {
+          this.handleUnauthorized()
+          return
+        }
+      } catch {
         return
       }
       // 后端只清未锁定记录，前端同步：保留锁定项、其余清掉。
