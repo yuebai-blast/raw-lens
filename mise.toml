@@ -36,3 +36,69 @@ run = "docker compose up -d"
 [tasks.down]
 description = "docker compose 停止并移除 rawlens"
 run = "docker compose down"
+
+# 发版：本项目版本号纯由 git tag 承载（无版本号文件可改），故只需打 tag + 推送。
+# 推送 v*.*.* tag 触发 .github/workflows/image.yml 构建并推镜像到 GHCR。
+# 用法：mise run release v0.2.0 "本次更新说明"   # 说明可省略
+#   有说明 → annotated tag（注释会被 Release 流程置顶到正文）；无说明 → 轻量 tag。
+[tasks.release]
+description = "发版：打 vX.Y.Z tag 并推送，触发 Image 工作流（参数：版本号 [更新说明]）"
+usage = '''
+arg "<version>" help="版本号，形如 v0.2.0 或 0.2.0（统一补 v 前缀）"
+arg "[notes]" help="本次更新说明（可选，写入 annotated tag 注释）"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+ver="${usage_version}"
+notes="${usage_notes:-}"
+
+# 允许传 0.2.0 或 v0.2.0，统一成带 v 前缀
+ver="v${ver#v}"
+
+# 校验形如 vX.Y.Z（可带预发布后缀，如 -rc.1）
+if ! printf '%s' "$ver" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+  echo "✗ 版本号不合法：${ver}（应形如 v0.2.0 / v1.0.0-rc.1）" >&2
+  exit 1
+fi
+
+# 只在 main 上发版
+branch="$(git rev-parse --abbrev-ref HEAD)"
+if [ "${branch}" != "main" ]; then
+  echo "✗ 当前在分支 ${branch}，发版请切到 main。" >&2
+  exit 1
+fi
+
+# 工作区必须干净，确保 tag 指向的代码与本地一致
+if [ -n "$(git status --porcelain)" ]; then
+  echo "✗ 工作区有未提交改动，请先提交后再发版。" >&2
+  exit 1
+fi
+
+# tag 不能重复
+if git rev-parse -q --verify "refs/tags/${ver}" >/dev/null; then
+  echo "✗ tag ${ver} 已存在。" >&2
+  exit 1
+fi
+
+# 确保本地 main 不落后于远程，避免基于过期 main 打 tag
+git fetch origin main --tags --quiet
+if [ -n "$(git rev-list "HEAD..origin/main" 2>/dev/null)" ]; then
+  echo "✗ 本地 main 落后于 origin/main，请先 git pull。" >&2
+  exit 1
+fi
+
+# 有说明用 annotated tag（注释置顶到 Release 正文），无说明用轻量 tag
+if [ -n "${notes}" ]; then
+  git tag -a "${ver}" -m "${notes}"
+else
+  git tag "${ver}"
+fi
+
+# 先推 main 上的提交，再推 tag 触发 Image 工作流
+git push origin main
+git push origin "${ver}"
+
+echo "✓ 已发版 ${ver}，Image 工作流将构建镜像并推送到 GHCR。"
+'''
