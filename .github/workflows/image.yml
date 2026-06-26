@@ -67,3 +67,63 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # 发 GitHub Release：镜像推成功后，生成「annotated tag 注释置顶 + 按提交类型过滤的变更日志」的发布说明。
+  # 仅 tag 触发时执行（workflow_dispatch 手动逃生口无 tag、无版本语义，不发 Release）。
+  release:
+    name: Publish GitHub Release
+    needs: image # 镜像推成功才发 Release，避免发了说明却没镜像
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 创建 Release 所需（覆盖顶层只读）
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # COMMIT 模式构建变更日志需要全量历史与 tag
+
+      # 变更日志交给标准 action 按约定式提交类型过滤：只收 feat/fix/perf/refactor/revert，
+      # 其余（docs/chore/ci/build/style/test）落 uncategorized，模板只输出各 category 之和故被排除。
+      - name: Build changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          mode: COMMIT # 直接按提交构建，不依赖 PR，适配直推 main；自动取上个 tag → 本 tag
+          configurationJson: |
+            {
+              "categories": [
+                {"title": "## 🚀 新功能", "labels": ["feat"]},
+                {"title": "## 🐛 修复", "labels": ["fix"]},
+                {"title": "## ⚡ 性能", "labels": ["perf"]},
+                {"title": "## ♻️ 重构", "labels": ["refactor"]},
+                {"title": "## ⏪ 回滚", "labels": ["revert"]}
+              ],
+              "label_extractor": [
+                {"pattern": "^(feat|fix|perf|refactor|revert|build|chore|ci|docs|style|test)[^:]*:.*", "on_property": "title", "target": "$1"}
+              ],
+              "template": "#{{CHANGELOG}}",
+              "empty_template": "- 本次无面向用户的变更"
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 拼正文：annotated tag 注释置顶（轻量 tag 无注释则跳过），下接过滤后的变更日志。
+      - name: Assemble release notes
+        env:
+          TAG: ${{ github.ref_name }}
+          CHANGELOG: ${{ steps.changelog.outputs.changelog }} # 经 env 传入，不在脚本里 ${{ }} 直插
+        run: |
+          : > notes.md
+          if [ "$(git cat-file -t "$TAG")" = "tag" ]; then
+            git tag -l --format='%(contents)' "$TAG" >> notes.md
+            printf '\n\n' >> notes.md
+          fi
+          printf '%s\n' "$CHANGELOG" >> notes.md
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: raw-lens ${{ github.ref_name }} # 标题：产品名 + 版本号（tag 已带 v 前缀）
+          body_path: notes.md
+          prerelease: ${{ contains(github.ref_name, '-') }} # 版本号含 - 即预发布
