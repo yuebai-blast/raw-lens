@@ -245,6 +245,26 @@ func TestMigrateOldAutoIncrementDB(t *testing.T) {
 	}
 }
 
+func TestSetLocked(t *testing.T) {
+	s := newMemStore(t, 500)
+	id := s.Add(sampleReq())
+	if got := s.Get(id); got == nil || got.Locked {
+		t.Fatalf("新记录 Locked 应为 false，得到 %+v", got)
+	}
+	s.SetLocked(id, true)
+	got := s.Get(id)
+	if got == nil || !got.Locked {
+		t.Errorf("SetLocked(true) 后 Locked 应为 true，得到 %+v", got)
+	}
+	if list := s.List(); len(list) != 1 || !list[0].Locked {
+		t.Errorf("List 应带回 Locked=true，得到 %+v", list)
+	}
+	s.SetLocked(id, false)
+	if got := s.Get(id); got == nil || got.Locked {
+		t.Errorf("SetLocked(false) 后 Locked 应为 false，得到 %+v", got)
+	}
+}
+
 func TestConcurrentAdd(t *testing.T) {
 	s := newMemStore(t, 1000)
 	var wg sync.WaitGroup
