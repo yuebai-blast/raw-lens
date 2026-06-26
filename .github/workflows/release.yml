@@ -120,6 +120,12 @@ jobs:
             printf '\n\n' >> notes.md
           fi
           printf '%s\n' "$CHANGELOG" >> notes.md
+          # 兜底：当本次提交「全被类型过滤」（changelog 为空）且 tag 无注释时，
+          # 正文会整篇空白——changelog action 的 empty_template 只在「零提交」时生效，
+          # 兜不住「有提交但全是 chore/ci 等被过滤」这种，故这里统一补占位文案。
+          if [ -z "$(tr -d '[:space:]' < notes.md)" ]; then
+            echo "- 本次无面向用户的变更" > notes.md
+          fi
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2
