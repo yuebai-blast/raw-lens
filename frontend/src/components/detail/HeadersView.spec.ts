@@ -4,7 +4,7 @@ import HeadersView from './HeadersView.vue'
 import type { Detail } from '@/types/api'
 
 const detail: Detail = {
-  id: 'aaaaaaaaaaaa', time: 't', remoteAddr: 'x', tls: false, method: 'GET', target: '/', proto: 'HTTP/1.1', name: '',
+  id: 'aaaaaaaaaaaa', time: 't', remoteAddr: 'x', tls: false, method: 'GET', target: '/', proto: 'HTTP/1.1', name: '', locked: false,
   headerCount: 3, bodySize: 0, rawSize: 0, requestLine: 'GET / HTTP/1.1',
   headers: [
     { name: 'Host', value: 'a' },

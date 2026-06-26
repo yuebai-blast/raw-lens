@@ -245,6 +245,26 @@ func TestMigrateOldAutoIncrementDB(t *testing.T) {
 	}
 }
 
+func TestSetLocked(t *testing.T) {
+	s := newMemStore(t, 500)
+	id := s.Add(sampleReq())
+	if got := s.Get(id); got == nil || got.Locked {
+		t.Fatalf("新记录 Locked 应为 false，得到 %+v", got)
+	}
+	s.SetLocked(id, true)
+	got := s.Get(id)
+	if got == nil || !got.Locked {
+		t.Errorf("SetLocked(true) 后 Locked 应为 true，得到 %+v", got)
+	}
+	if list := s.List(); len(list) != 1 || !list[0].Locked {
+		t.Errorf("List 应带回 Locked=true，得到 %+v", list)
+	}
+	s.SetLocked(id, false)
+	if got := s.Get(id); got == nil || got.Locked {
+		t.Errorf("SetLocked(false) 后 Locked 应为 false，得到 %+v", got)
+	}
+}
+
 func TestConcurrentAdd(t *testing.T) {
 	s := newMemStore(t, 1000)
 	var wg sync.WaitGroup
@@ -258,5 +278,59 @@ func TestConcurrentAdd(t *testing.T) {
 	wg.Wait()
 	if n := len(s.List()); n != 50 {
 		t.Errorf("并发写后应有 50 条，得到 %d", n)
+	}
+}
+
+func TestClearKeepsLocked(t *testing.T) {
+	s := newMemStore(t, 500)
+	keep := s.Add(sampleReq())
+	drop := s.Add(sampleReq())
+	s.SetLocked(keep, true)
+	s.Clear()
+	if s.Get(keep) == nil {
+		t.Errorf("Clear 后锁定记录 id=%q 应保留", keep)
+	}
+	if s.Get(drop) != nil {
+		t.Errorf("Clear 后未锁定记录 id=%q 应被清空", drop)
+	}
+}
+
+func TestDeleteSkipsLocked(t *testing.T) {
+	s := newMemStore(t, 500)
+	id := s.Add(sampleReq())
+	s.SetLocked(id, true)
+	s.Delete(id)
+	if s.Get(id) == nil {
+		t.Errorf("锁定记录不应被 Delete 删除")
+	}
+	s.SetLocked(id, false)
+	s.Delete(id)
+	if s.Get(id) != nil {
+		t.Errorf("解锁后应可正常删除")
+	}
+}
+
+func TestPruneExemptsLocked(t *testing.T) {
+	s := newMemStore(t, 3)
+	locked := s.Add(sampleReq()) // 最旧且锁定
+	s.SetLocked(locked, true)
+	var unlocked []string
+	for i := 0; i < 5; i++ {
+		unlocked = append(unlocked, s.Add(sampleReq()))
+	}
+	if s.Get(locked) == nil {
+		t.Errorf("锁定记录应豁免自动淘汰（即使最旧）")
+	}
+	kept := 0
+	for _, id := range unlocked {
+		if s.Get(id) != nil {
+			kept++
+		}
+	}
+	if kept != 3 {
+		t.Errorf("未锁定记录应只保留最近 3 条，实际保留 %d", kept)
+	}
+	if n := len(s.List()); n != 4 {
+		t.Errorf("List 应返回 4 条（1 锁定 + 3 未锁定），得到 %d", n)
 	}
 }

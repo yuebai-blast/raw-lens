@@ -32,6 +32,7 @@ type CapturedRequest struct {
 	Headers     [][2]string
 	Body        []byte
 	Name        string // 用户给该请求起的备注名，可空
+	Locked      bool   // 是否锁定：锁定记录无法删除、清空跳过、不计入自动淘汰
 }
 
 // Options 是打开 Store 的参数。
@@ -47,7 +48,7 @@ type Store struct {
 }
 
 // selectCols 统一 SELECT 的列顺序，scanRow 依赖此顺序。
-const selectCols = `id, captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw, name`
+const selectCols = `id, captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw, name, locked`
 
 // schema 是当前结构：seq 内部自增序号（仅排序/保留策略用），id 对外随机标识。
 const schema = `
@@ -64,7 +65,8 @@ CREATE TABLE IF NOT EXISTS captured_request (
   headers_json TEXT    NOT NULL,                  -- header 数组 JSON，保序保大小写 [["Name","Val"],...]
   body         BLOB,                              -- body 原始字节，可空
   raw          BLOB    NOT NULL,                  -- 连接上读到的全量原始字节，逐字保真
-  name         TEXT    NOT NULL DEFAULT ''        -- 用户给该请求起的备注名，默认空串
+  name         TEXT    NOT NULL DEFAULT '',       -- 用户给该请求起的备注名，默认空串
+  locked       INTEGER NOT NULL DEFAULT 0         -- 是否锁定：0=未锁 1=锁定；锁定记录免删/免清/免淘汰
 );
 `
 
@@ -105,9 +107,10 @@ func New(opts Options) (*Store, error) {
 
 // migrate 对老库做平滑升级，按代际顺序执行：
 //  1. 缺 name 列则补上（CREATE TABLE IF NOT EXISTS 不会给已存在的表加列）；
-//  2. 缺 seq 列（旧的自增整数 id 结构）则重建为随机 id 结构。
+//  2. 缺 seq 列（旧的自增整数 id 结构）则重建为随机 id 结构（重建出的新表已含 locked 列）；
+//  3. 缺 locked 列则 ALTER 补上（已有 seq 结构但在 locked 列加入前创建的库）。
 //
-// 先做 1 再做 2，保证重建时 SELECT 能安全引用 name 列。
+// 先做 1 再做 2，保证重建时 SELECT 能安全引用 name 列；第 3 步只在 seq 已存在时才执行。
 func migrate(db *sql.DB) error {
 	if !hasColumn(db, "captured_request", "name") {
 		if _, err := db.Exec(`ALTER TABLE captured_request ADD COLUMN name TEXT NOT NULL DEFAULT ''`); err != nil {
@@ -115,7 +118,12 @@ func migrate(db *sql.DB) error {
 		}
 	}
 	if !hasColumn(db, "captured_request", "seq") {
-		return rebuildWithRandomID(db)
+		return rebuildWithRandomID(db) // 重建出的新表已含 locked 列
+	}
+	if !hasColumn(db, "captured_request", "locked") {
+		if _, err := db.Exec(`ALTER TABLE captured_request ADD COLUMN locked INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -136,7 +144,7 @@ func rebuildWithRandomID(db *sql.DB) error {
 		   captured_at TEXT NOT NULL, remote_addr TEXT NOT NULL, tls INTEGER NOT NULL,
 		   request_line TEXT NOT NULL, method TEXT, target TEXT, proto TEXT,
 		   headers_json TEXT NOT NULL, body BLOB, raw BLOB NOT NULL,
-		   name TEXT NOT NULL DEFAULT '')`,
+		   name TEXT NOT NULL DEFAULT '', locked INTEGER NOT NULL DEFAULT 0)`,
 		`INSERT INTO captured_request_new
 		   (id, captured_at, remote_addr, tls, request_line, method, target, proto, headers_json, body, raw, name)
 		 SELECT lower(hex(randomblob(6))), captured_at, remote_addr, tls, request_line, method, target, proto,
@@ -222,22 +230,27 @@ func (s *Store) Add(cr *CapturedRequest) string {
 	return ""
 }
 
-// prune 按 max 条数保留最新记录，删掉更旧的。
+// prune 按 max 条数保留最新的未锁定记录，删掉更旧的未锁定记录；锁定记录免淘汰、不占名额。
 func (s *Store) prune() {
 	if s.max <= 0 {
 		return
 	}
 	if _, err := s.db.Exec(
 		`DELETE FROM captured_request
-		 WHERE seq <= (SELECT MAX(seq) FROM captured_request) - ?`, s.max); err != nil {
+		 WHERE locked = 0
+		   AND seq NOT IN (
+		     SELECT seq FROM captured_request
+		     WHERE locked = 0
+		     ORDER BY seq DESC LIMIT ?
+		   )`, s.max); err != nil {
 		log.Printf("store: 保留策略清理失败: %v", err)
 	}
 }
 
-// List 返回最近 max 条请求，按旧→新排序。
+// List 返回库内全部请求（锁定 + 保留的未锁定），按旧→新排序。未锁定上限由 prune 维护。
 func (s *Store) List() []*CapturedRequest {
 	rows, err := s.db.Query(
-		`SELECT `+selectCols+` FROM captured_request ORDER BY seq DESC LIMIT ?`, s.max)
+		`SELECT ` + selectCols + ` FROM captured_request ORDER BY seq DESC`)
 	if err != nil {
 		log.Printf("store: 查询失败: %v", err)
 		return nil
@@ -275,9 +288,9 @@ func (s *Store) Get(id string) *CapturedRequest {
 	return cr
 }
 
-// Clear 清空所有记录。
+// Clear 清空所有未锁定记录；锁定记录保留。
 func (s *Store) Clear() {
-	if _, err := s.db.Exec(`DELETE FROM captured_request`); err != nil {
+	if _, err := s.db.Exec(`DELETE FROM captured_request WHERE locked = 0`); err != nil {
 		log.Printf("store: 清空失败: %v", err)
 	}
 }
@@ -289,9 +302,20 @@ func (s *Store) SetName(id string, name string) {
 	}
 }
 
-// Delete 删除指定记录；删不存在的 id 不视为错误（幂等）。出错记日志。
+// SetLocked 设置/取消指定记录的锁定状态；锁定记录免删/免清/免自动淘汰。出错记日志。
+func (s *Store) SetLocked(id string, locked bool) {
+	v := 0
+	if locked {
+		v = 1
+	}
+	if _, err := s.db.Exec(`UPDATE captured_request SET locked = ? WHERE id = ?`, v, id); err != nil {
+		log.Printf("store: 设置 #%s 锁定失败: %v", id, err)
+	}
+}
+
+// Delete 删除指定的未锁定记录；锁定记录或不存在的 id 都不视为错误（幂等）。出错记日志。
 func (s *Store) Delete(id string) {
-	if _, err := s.db.Exec(`DELETE FROM captured_request WHERE id = ?`, id); err != nil {
+	if _, err := s.db.Exec(`DELETE FROM captured_request WHERE id = ? AND locked = 0`, id); err != nil {
 		log.Printf("store: 删除 #%s 失败: %v", id, err)
 	}
 }
@@ -317,15 +341,17 @@ func scanRow(sc scanner) (*CapturedRequest, error) {
 		cr                    CapturedRequest
 		capturedAt            string
 		tlsInt                int
+		lockedInt             int
 		headersJSON           string
 		method, target, proto sql.NullString
 	)
 	if err := sc.Scan(&cr.ID, &capturedAt, &cr.RemoteAddr, &tlsInt, &cr.RequestLine,
-		&method, &target, &proto, &headersJSON, &cr.Body, &cr.Raw, &cr.Name); err != nil {
+		&method, &target, &proto, &headersJSON, &cr.Body, &cr.Raw, &cr.Name, &lockedInt); err != nil {
 		return nil, err
 	}
 	cr.Method, cr.Target, cr.Proto = method.String, target.String, proto.String
 	cr.TLS = tlsInt != 0
+	cr.Locked = lockedInt != 0
 	if t, err := time.Parse(time.RFC3339Nano, capturedAt); err == nil {
 		cr.Time = t
 	}

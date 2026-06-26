@@ -15,6 +15,7 @@ interface State {
   firstLoad: boolean
   timer: number | null
   captureUrl: string
+  showLockedOnly: boolean
 }
 
 export const useCaptureStore = defineStore('captures', {
@@ -28,7 +29,14 @@ export const useCaptureStore = defineStore('captures', {
     firstLoad: true,
     timer: null,
     captureUrl: '',
+    showLockedOnly: false,
   }),
+  getters: {
+    // visibleList 是按「只看锁定」开关过滤后的列表，供视图渲染。
+    visibleList(state): Summary[] {
+      return state.showLockedOnly ? state.list.filter((i) => i.locked) : state.list
+    },
+  },
   actions: {
     // handleUnauthorized 是 401 响应的共享处理逻辑：停轮询、标记未登录、跳回登录页。
     handleUnauthorized() {
@@ -99,6 +107,26 @@ export const useCaptureStore = defineStore('captures', {
       if (item) item.name = name
       if (this.current && this.current.id === id) this.current.name = name
     },
+    // setLocked 切换某条记录的锁定状态，成功后同步更新本地 list 与 current。
+    async setLocked(id: string, locked: boolean) {
+      try {
+        const res = await fetch('/api/requests/' + id, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ locked }),
+        })
+        if (res.status === 401) {
+          this.handleUnauthorized()
+          return
+        }
+        if (!res.ok) return
+      } catch {
+        return
+      }
+      const item = this.list.find((i) => i.id === id)
+      if (item) item.locked = locked
+      if (this.current && this.current.id === id) this.current.locked = locked
+    },
     // remove 删除某条记录，成功后从 list 移除；若删的是当前项则清空详情并回到列表。
     async remove(id: string) {
       try {
@@ -121,12 +149,23 @@ export const useCaptureStore = defineStore('captures', {
       }
     },
     async clear() {
-      await fetch('/api/clear', { method: 'POST' })
-      this.list = []
-      this.current = null
-      this.activeId = null
+      try {
+        const res = await fetch('/api/clear', { method: 'POST' })
+        if (res.status === 401) {
+          this.handleUnauthorized()
+          return
+        }
+      } catch {
+        return
+      }
+      // 后端只清未锁定记录，前端同步：保留锁定项、其余清掉。
+      this.list = this.list.filter((i) => i.locked)
+      this.knownIds = new Set(this.list.map((i) => i.id))
       this.newIds = new Set()
-      this.knownIds = new Set()
+      if (this.current && !this.current.locked) {
+        this.current = null
+        this.activeId = null
+      }
       this.firstLoad = true
     },
     // fetchMeta 取面板元信息（抓包端口对外展示地址），失败静默——只是顶栏文案，不阻塞主流程。

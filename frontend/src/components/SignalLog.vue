@@ -19,6 +19,13 @@ async function remove(id: string) {
     await store.remove(id)
   }
 }
+
+// 切换某条记录的钉住/锁定状态。
+async function toggleLock(id: string) {
+  const item = store.list.find((i) => i.id === id)
+  if (!item) return
+  await store.setLocked(id, !item.locked)
+}
 </script>
 
 <template>
@@ -27,17 +34,27 @@ async function remove(id: string) {
     aria-label="captured requests"
   >
     <div class="log-head">
-      SIGNAL LOG
+      <span>SIGNAL LOG</span>
+      <button
+        type="button"
+        class="filter-lock"
+        :class="{ on: store.showLockedOnly }"
+        :title="store.showLockedOnly ? '显示全部记录' : '只看钉住的记录'"
+        @click="store.showLockedOnly = !store.showLockedOnly"
+      >
+        📌 ONLY
+      </button>
     </div>
     <div class="log-body">
       <LogItem
-        v-for="it in store.list"
+        v-for="it in store.visibleList"
         :key="it.id"
         :item="it"
         :active="it.id === store.activeId"
         :is-new="store.newIds.has(it.id)"
         @select="select"
         @delete="remove"
+        @toggle-lock="toggleLock"
       />
     </div>
   </aside>
@@ -51,9 +68,17 @@ async function remove(id: string) {
   background: linear-gradient(180deg, var(--panel), var(--bg));
 }
 .log-head {
+  display: flex; align-items: center; justify-content: space-between;
   padding: 11px 18px; font-family: var(--mono); font-size: 10px;
   letter-spacing: 3px; color: var(--muted); border-bottom: 1px solid var(--line-soft);
 }
+.filter-lock {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+  padding: 2px 7px; color: var(--muted); background: transparent;
+  border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
+  transition: color .12s, border-color .12s;
+}
+.filter-lock.on { color: var(--phosphor); border-color: var(--phosphor); }
 .log-body { overflow-y: auto; }
 
 @media (max-width: 760px) {

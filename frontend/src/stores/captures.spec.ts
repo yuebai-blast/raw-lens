@@ -15,7 +15,7 @@ function mockFetchOnce(json: unknown, ok = true, status?: number) {
 }
 
 const sample: Summary[] = [
-  { id: 'aaaaaaaaaaaa', time: '2026-06-19T00:00:00Z', remoteAddr: '1.2.3.4:5', tls: false, method: 'GET', target: '/a', proto: 'HTTP/1.1', name: '', headerCount: 2, bodySize: 0, rawSize: 30 },
+  { id: 'aaaaaaaaaaaa', time: '2026-06-19T00:00:00Z', remoteAddr: '1.2.3.4:5', tls: false, method: 'GET', target: '/a', proto: 'HTTP/1.1', name: '', locked: false, headerCount: 2, bodySize: 0, rawSize: 30 },
 ]
 
 describe('useCaptureStore', () => {
@@ -133,5 +133,42 @@ describe('useCaptureStore', () => {
     const s = useCaptureStore()
     await s.fetchMeta()
     expect(s.captureUrl).toBe('')
+  })
+
+  it('setLocked 成功后更新 list 中该项的 locked 并发 PATCH', async () => {
+    const s = useCaptureStore()
+    vi.stubGlobal('fetch', mockFetchOnce(sample))
+    await s.refresh()
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => null })
+    vi.stubGlobal('fetch', fetchMock)
+    await s.setLocked('aaaaaaaaaaaa', true)
+    expect(fetchMock).toHaveBeenCalledWith('/api/requests/aaaaaaaaaaaa', expect.objectContaining({ method: 'PATCH' }))
+    expect(s.list[0].locked).toBe(true)
+  })
+
+  it('clear 后保留锁定项、清掉未锁定项', async () => {
+    const s = useCaptureStore()
+    const two: Summary[] = [
+      { ...sample[0], id: 'aaaaaaaaaaaa', locked: true },
+      { ...sample[0], id: 'bbbbbbbbbbbb', locked: false },
+    ]
+    vi.stubGlobal('fetch', mockFetchOnce(two))
+    await s.refresh()
+    vi.stubGlobal('fetch', mockFetchOnce(null))
+    await s.clear()
+    expect(s.list.map((i) => i.id)).toEqual(['aaaaaaaaaaaa'])
+  })
+
+  it('visibleList 在 showLockedOnly 下只返回锁定项', async () => {
+    const s = useCaptureStore()
+    const two: Summary[] = [
+      { ...sample[0], id: 'aaaaaaaaaaaa', locked: true },
+      { ...sample[0], id: 'bbbbbbbbbbbb', locked: false },
+    ]
+    vi.stubGlobal('fetch', mockFetchOnce(two))
+    await s.refresh()
+    expect(s.visibleList).toHaveLength(2)
+    s.showLockedOnly = true
+    expect(s.visibleList.map((i) => i.id)).toEqual(['aaaaaaaaaaaa'])
   })
 })
