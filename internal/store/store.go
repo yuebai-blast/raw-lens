@@ -229,22 +229,27 @@ func (s *Store) Add(cr *CapturedRequest) string {
 	return ""
 }
 
-// prune 按 max 条数保留最新记录，删掉更旧的。
+// prune 按 max 条数保留最新的未锁定记录，删掉更旧的未锁定记录；锁定记录免淘汰、不占名额。
 func (s *Store) prune() {
 	if s.max <= 0 {
 		return
 	}
 	if _, err := s.db.Exec(
 		`DELETE FROM captured_request
-		 WHERE seq <= (SELECT MAX(seq) FROM captured_request) - ?`, s.max); err != nil {
+		 WHERE locked = 0
+		   AND seq NOT IN (
+		     SELECT seq FROM captured_request
+		     WHERE locked = 0
+		     ORDER BY seq DESC LIMIT ?
+		   )`, s.max); err != nil {
 		log.Printf("store: 保留策略清理失败: %v", err)
 	}
 }
 
-// List 返回最近 max 条请求，按旧→新排序。
+// List 返回库内全部请求（锁定 + 保留的未锁定），按旧→新排序。未锁定上限由 prune 维护。
 func (s *Store) List() []*CapturedRequest {
 	rows, err := s.db.Query(
-		`SELECT `+selectCols+` FROM captured_request ORDER BY seq DESC LIMIT ?`, s.max)
+		`SELECT ` + selectCols + ` FROM captured_request ORDER BY seq DESC`)
 	if err != nil {
 		log.Printf("store: 查询失败: %v", err)
 		return nil
@@ -282,9 +287,9 @@ func (s *Store) Get(id string) *CapturedRequest {
 	return cr
 }
 
-// Clear 清空所有记录。
+// Clear 清空所有未锁定记录；锁定记录保留。
 func (s *Store) Clear() {
-	if _, err := s.db.Exec(`DELETE FROM captured_request`); err != nil {
+	if _, err := s.db.Exec(`DELETE FROM captured_request WHERE locked = 0`); err != nil {
 		log.Printf("store: 清空失败: %v", err)
 	}
 }
@@ -307,9 +312,9 @@ func (s *Store) SetLocked(id string, locked bool) {
 	}
 }
 
-// Delete 删除指定记录；删不存在的 id 不视为错误（幂等）。出错记日志。
+// Delete 删除指定的未锁定记录；锁定记录或不存在的 id 都不视为错误（幂等）。出错记日志。
 func (s *Store) Delete(id string) {
-	if _, err := s.db.Exec(`DELETE FROM captured_request WHERE id = ?`, id); err != nil {
+	if _, err := s.db.Exec(`DELETE FROM captured_request WHERE id = ? AND locked = 0`, id); err != nil {
 		log.Printf("store: 删除 #%s 失败: %v", id, err)
 	}
 }
