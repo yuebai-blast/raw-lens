@@ -32,25 +32,20 @@ jobs:
           key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
           restore-keys: go-${{ runner.os }}-
 
+      # 命令统一收口到 mise task，与本地、Dockerfile 单一来源，避免漂移
       - name: Check formatting
-        run: |
-          files="$(gofmt -l .)"
-          if [ -n "$files" ]; then
-            echo "以下文件需要 gofmt:"
-            echo "$files"
-            exit 1
-          fi
+        run: mise run fmt-backend
 
-      # 本项目并发处理连接、共享同一个 store.Store，开 -race 检测数据竞争
+      # 本项目并发处理连接、共享同一个 store.Store，task 内开 -race 检测数据竞争
       - name: Run tests (race)
-        run: go test -race ./...
+        run: mise run test-backend
 
       - name: Run vet
-        run: go vet ./...
+        run: mise run vet-backend
 
       # 验证可编译（web/dist/.keep 已提交，无需前端产物即可 embed）
       - name: Build
-        run: go build ./...
+        run: mise run build-backend
 
   frontend:
     name: Frontend
@@ -74,18 +69,13 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
 
-      # 前端依赖（node_modules）不在仓库里，必须在 build/test 之前安装
+      # 前端依赖（node_modules）不在仓库里，门禁前显式装、走 --frozen 保证可复现
       - name: Install frontend dependencies
-        run: pnpm -C frontend install --frozen-lockfile
+        run: mise run install-frontend --frozen
 
-      - name: Typecheck
-        run: pnpm -C frontend typecheck
-
-      - name: Lint
-        run: pnpm -C frontend lint
-
-      - name: Test
-        run: pnpm -C frontend test
+      # typecheck + lint + vitest 收口在一个 task，与本地单一来源
+      - name: Check frontend
+        run: mise run test-frontend
 
       - name: Build
-        run: pnpm -C frontend build
+        run: mise run build-frontend

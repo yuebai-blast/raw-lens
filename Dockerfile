@@ -8,6 +8,9 @@ FROM debian:13-slim AS build
 ENV MISE_VERSION=v2026.6.0
 ENV MISE_DATA_DIR=/mise MISE_CONFIG_DIR=/mise MISE_CACHE_DIR=/mise/cache \
     MISE_INSTALL_PATH=/usr/local/bin/mise PATH=/mise/shims:$PATH
+# 关掉「mise run 跑 task 前自动装全部 [tools]」：本镜像只显式装所需工具（见下方 mise install），
+# 让下面的 mise run 直接用已装工具，不再额外触发安装
+ENV MISE_TASK_RUN_AUTO_INSTALL=false
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl git ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
@@ -18,18 +21,20 @@ WORKDIR /src
 COPY mise.toml ./
 RUN mise trust && mise install go node pnpm
 
-# 层缓存：依赖清单先于源码 COPY，清单不变则不重装（见 monorepo-docker-build.md §6）
+# 层缓存：依赖清单先于源码 COPY，清单不变则不重装（见 monorepo-docker-build.md §6）。
+# 安装/构建命令一律走 mise run task，与本地、CI 单一来源（不在 Dockerfile 里重抄 pnpm/go 命令）。
 # 1) 前端依赖（pnpm-lock.yaml 不变则命中缓存）
 COPY frontend/package.json frontend/pnpm-lock.yaml ./frontend/
-RUN pnpm -C frontend install --frozen-lockfile
+RUN mise run install-frontend --frozen
 # 2) Go 依赖（go.mod/go.sum 不变则命中缓存）
 COPY go.mod go.sum ./
-RUN go mod download
+RUN mise run install-backend
 
-# 3) 拷源码：先前端 build 出 web/dist，再 CGO_ENABLED=0 纯 Go 编译把它 embed 进单二进制
+# 3) 拷源码后一条 mise task 收口构建：build 依赖 build-frontend 先出 web/dist，
+#    再瘦身编译（CGO_ENABLED=0 纯 Go + -trimpath -ldflags=-s -w）把 web/dist embed 进单二进制到 bin/rawlens。
+#    命令与本地、CI 单一来源，不在 Dockerfile 里重抄 go 命令。
 COPY . .
-RUN pnpm -C frontend build \
- && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/rawlens ./cmd/rawlens
+RUN mise run build
 
 # ---- 运行阶段：普通 debian-slim 底座（默认 root），只带二进制 ----
 # 用普通镜像而非 distroless 非 root：以 root 跑，直接可写 bind 挂载进来的目录，
@@ -39,7 +44,7 @@ FROM debian:13-slim AS runtime
 RUN apt-get update \
  && apt-get install -y --no-install-recommends wget \
  && rm -rf /var/lib/apt/lists/*
-COPY --from=build /out/rawlens /usr/local/bin/rawlens
+COPY --from=build /src/bin/rawlens /usr/local/bin/rawlens
 # WORKDIR=/app：默认读 /app/config.yaml，db 落 /app/data/db、日志落 /app/data/logs
 # （部署时把宿主 ./config.yaml、./data 分别挂到 /app/config.yaml、/app/data）。
 WORKDIR /app

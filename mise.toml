@@ -5,30 +5,94 @@ go = "1.26.4"
 node = "20.18.1"
 pnpm = "9.15.9"
 
+# —— 安装 ——
+# 聚合 install：一条命令装齐两端依赖（depends 聚合是 install 的正当用途）。
 [tasks.install]
-description = "安装全部依赖（Go 模块 + 前端 pnpm）"
-run = ["go mod download", "pnpm -C frontend install"]
+description = "安装全部依赖（后端 Go 模块 + 前端 pnpm）"
+depends = ["install-backend", "install-frontend"]
 
+[tasks.install-backend]
+description = "下载后端 Go 模块依赖"
+run = "go mod download"
+
+# 默认本地（可更新 lockfile）；CI/Docker 传 --frozen 走 --frozen-lockfile（与 lockfile 不一致即报错）。
+[tasks.install-frontend]
+description = "安装前端 pnpm 依赖（--frozen 用于 CI/Docker，按 lockfile 精确安装）"
+usage = '''
+flag "--frozen" help="按 lockfile 精确安装、不更新 lockfile（CI/Docker 用）"
+'''
+dir = "frontend"
+run = "pnpm install ${usage_frozen:+--frozen-lockfile}"
+
+# —— 运行 ——
 [tasks.api]
 description = "本地运行后端（提供 /api 与面板，读 ./config.yaml）"
 run = "go run ./cmd/rawlens"
 
 [tasks.webui]
 description = "本地运行前端 Vite dev server（HMR，proxy /api 到 :9101）"
-run = "pnpm -C frontend dev"
+dir = "frontend"
+run = "pnpm vite"
 
+# 预览前端生产构建（vite preview）；mise 是命令唯一来源，不留在 package.json scripts。
+[tasks.preview-frontend]
+description = "本地预览前端生产构建产物（vite preview）"
+dir = "frontend"
+run = "pnpm vite preview"
+
+# —— 构建 ——
+[tasks.build-frontend]
+description = "构建前端产物到 web/dist（供后端 embed，先 vue-tsc 类型校验再 vite build）"
+dir = "frontend"
+run = "pnpm vue-tsc --noEmit && pnpm vite build"
+
+# 真依赖：二进制 embed web/dist，必须先构建前端产物，否则 embed 进去的是旧的/占位 dist。
+# 一律瘦身编译（CGO_ENABLED=0 纯 Go + -trimpath -ldflags="-s -w"），本地与镜像同一条命令；
+# 日常开发用 mise run api（go run）不跑这里，故 build 就是「产出可分发二进制」，无需区分 dev/release。
 [tasks.build]
-description = "构建前端并编译单二进制到 bin/rawlens"
-run = ["pnpm -C frontend build", "go build -o bin/rawlens ./cmd/rawlens"]
+description = "构建前端并瘦身编译单二进制到 bin/rawlens"
+depends = ["build-frontend"]
+run = 'CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/rawlens ./cmd/rawlens'
 
-[tasks.test-web]
-description = "前端检查：typecheck + lint + vitest"
-run = ["pnpm -C frontend typecheck", "pnpm -C frontend lint", "pnpm -C frontend test"]
+# 编译校验（用 web/dist/.keep 占位即可编译，不依赖前端产物），供 CI 后端门禁用。
+[tasks.build-backend]
+description = "编译校验全部后端 Go 包（go build ./...）"
+run = "go build ./..."
 
 [tasks.image]
 description = "本地构建 Docker 镜像（单架构，验证 Dockerfile）"
 run = "docker build -t rawlens:local ."
 
+# —— 质量 ——
+# gofmt 校验：有未格式化文件即列出并失败（CI 门禁与本地自查共用）。
+[tasks.fmt-backend]
+description = "后端 gofmt 格式校验（有未格式化文件即失败）"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+files="$(gofmt -l .)"
+if [ -n "${files}" ]; then
+  echo "以下文件需要 gofmt:" >&2
+  echo "${files}" >&2
+  exit 1
+fi
+'''
+
+[tasks.vet-backend]
+description = "后端 go vet 静态检查"
+run = "go vet ./..."
+
+# 本项目并发处理连接、共享同一个 store.Store，开 -race 检测数据竞争。
+[tasks.test-backend]
+description = "后端测试（开启竞态检测）"
+run = "go test -race ./..."
+
+[tasks.test-frontend]
+description = "前端检查：typecheck + lint + vitest"
+dir = "frontend"
+run = ["pnpm vue-tsc --noEmit", "pnpm eslint . --ext .ts,.vue", "pnpm vitest run"]
+
+# —— 部署 ——
 [tasks.up]
 description = "docker compose 后台启动 rawlens"
 run = "docker compose up -d"

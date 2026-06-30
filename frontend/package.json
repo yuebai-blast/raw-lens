@@ -2,14 +2,7 @@
   "name": "raw-lens-frontend",
   "private": true,
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit",
-    "lint": "eslint . --ext .ts,.vue",
-    "test": "vitest run"
-  },
+  "comment": "命令唯一来源在根 mise.toml 的 task（dev/build/typecheck/lint/test/preview 见 webui/build-frontend/test-frontend/preview-frontend），故此处不设 scripts。",
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",
     "@fontsource/ibm-plex-sans": "^5.1.0",

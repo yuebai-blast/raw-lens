@@ -11,21 +11,23 @@
 
 ## CI 流程
 
-CI 由 `.github/workflows/ci.yml` 定义，在向 `main` 推送代码、创建或更新 Pull Request 时运行。拆成三个并行 job：
+CI 由 `.github/workflows/ci.yml` 定义，在向 `main` 推送代码、创建或更新 Pull Request 时运行。两个并行 job（所有检查命令统一走 `mise run`，与本地、Dockerfile 单一来源）：
 
-- **backend**：`gofmt` 检查、`go test -race ./...`（本项目并发处理连接、共享 store，开竞态检测）、`go vet ./...`、`go build ./...`。
-- **frontend**：`pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`。
+- **quality**：复用 `quality.yml`（与 `release.yml` 发版前门禁共用同一份定义），内含两个并行子 job：
+  - **backend**：`mise run fmt-backend`（gofmt 校验）、`mise run test-backend`（`go test -race ./...`，本项目并发处理连接、共享 store，开竞态检测）、`mise run vet-backend`、`mise run build-backend`。
+  - **frontend**：`mise run install-frontend --frozen`、`mise run test-frontend`（typecheck + lint + vitest）、`mise run build-frontend`。
 - **image-build**：`docker build` 只构建不推送（单架构），合并前提前暴露 Dockerfile 损坏。
 
 本地提交前建议运行：
 
 ```bash
-gofmt -w .
-go test -race ./...
-go vet ./...
-mise run test-web   # 前端 typecheck + lint + test
-mise run build      # 前端 pnpm build + 编译二进制
-mise run image      # 本地验证 Dockerfile（单架构）
+gofmt -w .            # 先把格式问题就地修掉（fmt-backend 只校验不修改）
+mise run fmt-backend  # gofmt 校验
+mise run vet-backend  # go vet
+mise run test-backend # go test -race ./...
+mise run test-frontend # 前端 typecheck + lint + test
+mise run build        # 前端构建 + 编译二进制
+mise run image        # 本地验证 Dockerfile（单架构）
 ```
 
 ## 发布流程
@@ -46,9 +48,10 @@ git status --short
 
 ```bash
 gofmt -w .
-go test -race ./...
-go vet ./...
-mise run test-web
+mise run fmt-backend
+mise run vet-backend
+mise run test-backend
+mise run test-frontend
 mise run image      # 本地构建镜像，验证 Dockerfile
 ```
 
